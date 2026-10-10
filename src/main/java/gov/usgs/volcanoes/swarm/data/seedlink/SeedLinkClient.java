@@ -12,6 +12,7 @@ import gov.usgs.volcanoes.swarm.Swarm;
 import gov.usgs.volcanoes.swarm.data.CachedDataSource;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.HashSet;
@@ -27,6 +28,7 @@ import nl.knmi.orfeus.seedlink.SLLog;
 import nl.knmi.orfeus.seedlink.SLPacket;
 import nl.knmi.orfeus.seedlink.SeedLinkException;
 import nl.knmi.orfeus.seedlink.client.SeedLinkConnection;
+import nl.knmi.orfeus.seedlink.client.SLState;
 
 /**
  * SeedLink client.
@@ -36,6 +38,48 @@ import nl.knmi.orfeus.seedlink.client.SeedLinkConnection;
 public class SeedLinkClient implements Runnable {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SeedLinkClient.class);
+
+  private static final class HeaderOnlyPacket extends SLPacket {
+    HeaderOnlyPacket(byte[] data, int offset) throws SeedLinkException {
+      super(data, offset);
+    }
+
+    @Override
+    public int getType() throws SeedLinkException {
+      final String header = new String(slhead, 0, INFOSIGNATURE.length(),
+          StandardCharsets.US_ASCII);
+      if (header.equalsIgnoreCase(INFOSIGNATURE)) {
+        return super.getType();
+      }
+      // collect() calls getType() before updateStream(). Defer mini-SEED decoding
+      // until updateStream() holds the JavaSeedLite factory lock.
+      return 999;
+    }
+  }
+
+  private static final class HeaderOnlyState extends SLState {
+    @Override
+    public SLPacket getPacket() throws SeedLinkException {
+      if (!packetAvailable()) {
+        throw new SeedLinkException("SLPacket not available to send");
+      }
+      return new HeaderOnlyPacket(databuf, sendptr);
+    }
+  }
+
+  private static final class PacketWave {
+    final SLPacket packet;
+    final Wave wave;
+    final String scnl;
+
+    PacketWave(SLPacket packet, Wave wave, String scnl) {
+      this.packet = packet;
+      this.wave = wave;
+      this.scnl = scnl;
+    }
+  }
+
+  private PacketWave decodedWave;
 
   /** SeedLink server address. */
   private String sladdr;
@@ -107,7 +151,40 @@ public class SeedLinkClient implements Runnable {
    */
   private void createConnection() {
 
-    slconn = new SeedLinkConnection(new SLLog());
+    slconn = new SeedLinkConnection(new SLLog()) {
+      {
+        state = new HeaderOnlyState();
+      }
+
+      @Override
+      public void disconnect() {
+        super.disconnect();
+        state = new HeaderOnlyState();
+      }
+
+      @Override
+      protected SLPacket doTerminate() {
+        final SLPacket packet = super.doTerminate();
+        state = new HeaderOnlyState();
+        return packet;
+      }
+
+      @Override
+      public void updateStream(SLPacket packet) throws SeedLinkException {
+        // JavaSeedLite keeps blockette containers in a process-wide factory.
+        // Decode and copy the wave before another client resets that factory.
+        synchronized (BlocketteDecoratorFactory.class) {
+          BlocketteDecoratorFactory.reset();
+          decodedWave = null;
+          super.updateStream(packet);
+          try {
+            decodedWave = snapshotWave(packet);
+          } catch (Exception ex) {
+            throw new SeedLinkException("failed to decode mini-seed waveform: " + ex);
+          }
+        }
+      }
+    };
     slconn.setSLAddress(sladdr);
 
     // Make sure a server was specified
@@ -311,6 +388,30 @@ public class SeedLinkClient implements Runnable {
     return Double.parseDouble(obj.toString());
   }
 
+  private PacketWave snapshotWave(SLPacket packet) throws Exception {
+    final Blockette blockette = packet.getBlockette();
+    final Waveform waveform = blockette.getWaveform();
+    if (waveform == null || blockette.getType() != 999) {
+      return null;
+    }
+
+    final Btime bTime = getBtime(blockette, 8);
+    final double factor = getDouble(blockette, 10);
+    final double multiplier = getDouble(blockette, 11);
+    final Wave wave = new Wave();
+    wave.setSamplingRate(getSampleRate(factor, multiplier));
+    wave.setStartTime(J2kSec.fromDate(btimeToDate(bTime)));
+    wave.buffer = waveform.getDecodedIntegers().clone();
+
+    final String network = (String) blockette.getFieldVal(7);
+    final String station = (String) blockette.getFieldVal(4);
+    final String location = (String) blockette.getFieldVal(5);
+    final String channel = (String) blockette.getFieldVal(6);
+    final String scnl = (station + " " + channel + " " + network + " " + location)
+        .trim().replace(" ", "$");
+    return new PacketWave(packet, wave, scnl);
+  }
+
   /**
    * Method that processes each packet received from the SeedLink server. This is based on code
    * lifted from SeedLinkManager in SeisGram2K with clock logic removed.
@@ -356,34 +457,13 @@ public class SeedLinkClient implements Runnable {
       }
     }
 
-    // if here, must be a blockette
-    final Blockette blockette = slpack.getBlockette();
-    LOGGER.trace("packet seqnum={}, packet type={}, blockette type={}, blockette={}",
-        slpack.getSequenceNumber(), type, blockette.getType(), blockette);
-
-    final Waveform waveform = blockette.getWaveform();
-    // if waveform and FSDH
-    if (waveform != null && blockette.getType() == 999 && Swarm.getApplicationFrame() != null) {
-      // convert waveform to wave (also done in
-      // gov.usgs.swarm.data.FileDataSource)
+    final PacketWave packetWave = decodedWave;
+    LOGGER.trace("packet seqnum={}, packet type={}", slpack.getSequenceNumber(), type);
+    if (packetWave != null && packetWave.packet == slpack
+        && Swarm.getApplicationFrame() != null) {
       try {
-        final Btime bTime = getBtime(blockette, 8);
-        final double factor = getDouble(blockette, 10);
-        final double multiplier = getDouble(blockette, 11);
-        final double startTime = J2kSec.fromDate(btimeToDate(bTime));
-        final double samplingRate = getSampleRate(factor, multiplier);
-        final Wave wave = new Wave();
-        wave.setSamplingRate(samplingRate);
-        wave.setStartTime(startTime);
-        wave.buffer = waveform.getDecodedIntegers();
-        wave.register();
-        String network = (String) blockette.getFieldVal(7);
-        String station = (String) blockette.getFieldVal(4);
-        String location = (String) blockette.getFieldVal(5);
-        String channel = (String) blockette.getFieldVal(6);
-        String scnl = station + " " + channel + " " + network + " " + location;
-        scnl = scnl.trim().replace(" ", "$");
-        cacheWave(scnl, wave);
+        packetWave.wave.register();
+        cacheWave(packetWave.scnl, packetWave.wave);
       } catch (Exception ex) {
         LOGGER.warn("packetHandler: could not create wave", ex);
         return true; // close the connection
@@ -412,10 +492,6 @@ public class SeedLinkClient implements Runnable {
         if (slpack == SLPacket.SLTERMINATE) {
           break;
         }
-
-        slpack.getType(); // ensure the blockette is created if needed
-        // reset the volume counter
-        BlocketteDecoratorFactory.reset();
 
         try {
           // do something with packet
