@@ -170,6 +170,9 @@ public class MapPanel extends JPanel {
   private static final long serialVersionUID = 1L;
 
   private static final int INSET = 30;
+  private static final Integer MAP_LAYER = Integer.valueOf(10);
+  private static final Integer ICON_LAYER = Integer.valueOf(15);
+  private static final Integer PANEL_LAYER = Integer.valueOf(20);
 
   private List<Line2D.Double> lines;
 
@@ -199,7 +202,9 @@ public class MapPanel extends JPanel {
   private DragMode dragMode = DragMode.DRAG_MAP;
   private Point mouseDown;
   private Point mouseNow;
+  private final Point mouseNowHolder = new Point();
   private Rectangle dragRectangle;
+  private final Rectangle dragRectangleHolder = new Rectangle();
 
   private final Stack<double[]> mapHistory;
   private final Stack<double[]> timeHistory;
@@ -398,7 +403,7 @@ public class MapPanel extends JPanel {
       public void keyTyped(final KeyEvent e) {}
     });
 
-    pane.add(mapImagePanel, new Integer(10));
+    pane.add(mapImagePanel, MAP_LAYER);
     add(pane, BorderLayout.CENTER);
 
   }
@@ -1067,7 +1072,7 @@ public class MapPanel extends JPanel {
             lines.clear();
           }
           pane.removeAll();
-          pane.add(mapImagePanel, new Integer(10));
+          pane.add(mapImagePanel, MAP_LAYER);
           // /
           visiblePanels.clear();
           for (final MapMiniPanel mp : miniPanels.values()) {
@@ -1075,14 +1080,14 @@ public class MapPanel extends JPanel {
           }
 
           pane.removeAll();
-          pane.add(mapImagePanel, new Integer(10));
+          pane.add(mapImagePanel, MAP_LAYER);
 
           if (compsToAdd != null) {
             for (final JComponent comp : compsToAdd) {
               if (comp instanceof JLabel) {
-                pane.add(comp, new Integer(15));
+                pane.add(comp, ICON_LAYER);
               } else {
-                pane.add(comp, new Integer(20));
+                pane.add(comp, PANEL_LAYER);
               }
             }
           }
@@ -1372,8 +1377,8 @@ public class MapPanel extends JPanel {
           setCursor(Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR));
         }
         mouseDown = e.getPoint();
-        dragRectangle = new Rectangle();
-        dragRectangle.setFrameFromDiagonal(mouseDown, mouseDown);
+        dragRectangleHolder.setFrameFromDiagonal(mouseDown, mouseDown);
+        dragRectangle = dragRectangleHolder;
       }
     }
 
@@ -1447,13 +1452,14 @@ public class MapPanel extends JPanel {
      * @see java.awt.event.MouseMotionListener#mouseDragged(java.awt.event.MouseEvent)
      */
     public void mouseDragged(final MouseEvent e) {
-      mouseNow = e.getPoint();
+      mouseNowHolder.setLocation(e.getX(), e.getY());
+      mouseNow = mouseNowHolder;
       final Point2D.Double lonLat = getLonLat(e.getX(), e.getY());
       if (dragMode == DragMode.DRAG_MAP) {
         if (SwingUtilities.isLeftMouseButton(e) && pane.getComponentCount() != 1) {
           lines.clear();
           pane.removeAll();
-          pane.add(mapImagePanel, new Integer(10));
+          pane.add(mapImagePanel, MAP_LAYER);
 
           repaint();
         }
