@@ -14,6 +14,7 @@ import gov.usgs.volcanoes.core.legacy.plot.render.wave.SpectraRenderer;
 import gov.usgs.volcanoes.core.legacy.plot.render.wave.SpectrogramRenderer;
 import gov.usgs.volcanoes.core.math.Util;
 import gov.usgs.volcanoes.core.time.J2kSec;
+import gov.usgs.volcanoes.core.time.Time;
 import gov.usgs.volcanoes.quakeml.Pick;
 import gov.usgs.volcanoes.swarm.Icons;
 import gov.usgs.volcanoes.swarm.Metadata;
@@ -45,8 +46,12 @@ import java.awt.geom.GeneralPath;
 import java.awt.geom.Line2D;
 import java.awt.image.BufferedImage;
 import java.text.NumberFormat;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.Locale;
+import java.util.TimeZone;
 import javax.swing.JComponent;
 import javax.swing.SwingUtilities;
 import javax.swing.event.EventListenerList;
@@ -155,6 +160,19 @@ public class WaveViewPanel extends JComponent {
   private double filteredCorner1 = Double.NaN;
   private double filteredCorner2 = Double.NaN;
   private double filteredRate = Double.NaN;
+  /**
+   * Cursor timestamps stay on this formatter. Mouse handling is on the event thread, so it is not
+   * shared with another thread. A new one is built when the default locale changes.
+   */
+  private SimpleDateFormat cursorFormat;
+  private Locale cursorFormatLocale;
+  private final Date cursorDate = new Date();
+  private boolean cursorTextValid;
+  private long cursorTimeBits;
+  private TimeZone cursorZone;
+  private int cursorRawOffset;
+  private int cursorDstSavings;
+  private String cursorText;
 
   // pick and tag data
   private PickData pickData;
@@ -642,7 +660,7 @@ public class WaveViewPanel extends JComponent {
           status.append(durationString);
         }
 
-        String timeString = StatusTextArea.getTimeString(time, swarmConfig.getTimeZone(channel));
+        String timeString = cursorTimeText(time);
         if (timeString != null) {
           status.append("\n");
           status.append(timeString);
@@ -756,6 +774,52 @@ public class WaveViewPanel extends JComponent {
       waveInfoText = StatusTextArea.getWaveInfo(wave);
     }
     return waveInfoText;
+  }
+
+  /**
+   * Same text as {@link StatusTextArea#getTimeString}. The formatter matches {@link Time#format}
+   * and is reused for later samples instead of constructing one per hover.
+   */
+  private String cursorTimeText(double j2k) {
+    TimeZone zone = swarmConfig.getTimeZone(channel);
+    long bits = Double.doubleToLongBits(j2k);
+    int raw = zone.getRawOffset();
+    int dst = zone.getDSTSavings();
+    if (cursorTextValid && bits == cursorTimeBits && zone == cursorZone && raw == cursorRawOffset
+        && dst == cursorDstSavings) {
+      return cursorText;
+    }
+    cursorText = formatCursorTime(j2k, zone);
+    cursorTimeBits = bits;
+    cursorZone = zone;
+    cursorRawOffset = raw;
+    cursorDstSavings = dst;
+    cursorTextValid = true;
+    return cursorText;
+  }
+
+  private String formatCursorTime(double j2k, TimeZone zone) {
+    Locale locale = Locale.getDefault();
+    if (cursorFormat == null || cursorFormatLocale != locale) {
+      cursorFormat = new SimpleDateFormat(Time.STANDARD_TIME_FORMAT_MS);
+      cursorFormat.setTimeZone(Time.DEFAULT_TIME_ZONE);
+      cursorFormatLocale = locale;
+    }
+    String utc = formatCursorEpoch(j2k);
+    long epoch = J2kSec.asEpoch(j2k);
+    double tzo = zone.getOffset(epoch) / 1000.0;
+    if (tzo != 0) {
+      cursorDate.setTime(epoch);
+      String tza = zone.getDisplayName(zone.inDaylightTime(cursorDate), TimeZone.SHORT);
+      String local = formatCursorEpoch(j2k + tzo);
+      return local + " (" + tza + "), " + utc + " (UTC)";
+    }
+    return utc;
+  }
+
+  private String formatCursorEpoch(double j2k) {
+    cursorDate.setTime(J2kSec.asEpoch(j2k));
+    return cursorFormat.format(cursorDate);
   }
 
   /**
