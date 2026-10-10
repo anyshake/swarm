@@ -72,6 +72,7 @@ public class RsamRatioPanel extends JComponent implements SettingsListener {
    * efficiency.
    */
   private final transient Offscreen offscreen = new Offscreen();
+  private transient Offscreen.Painter plotPainter;
   private Plot plot;
   private RSAMData countedData;
   private int countedThreshold = Integer.MIN_VALUE;
@@ -160,11 +161,14 @@ public class RsamRatioPanel extends JComponent implements SettingsListener {
   }
 
   private void createImage() {
-    offscreen.render(this, new Offscreen.Painter() {
-      public void paint(Graphics2D graphics) {
-        constructPlot(graphics);
-      }
-    }, true);
+    if (plotPainter == null) {
+      plotPainter = new Offscreen.Painter() {
+        public void paint(Graphics2D graphics) {
+          constructPlot(graphics);
+        }
+      };
+    }
+    offscreen.render(this, plotPainter, true);
   }
 
   /**

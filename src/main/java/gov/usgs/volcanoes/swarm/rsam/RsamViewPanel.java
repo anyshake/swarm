@@ -85,6 +85,8 @@ public class RsamViewPanel extends JComponent implements SettingsListener {
    * efficiency.
    */
   private final transient Offscreen offscreen = new Offscreen();
+  private transient Offscreen.Painter plotPainter;
+  private final Line2D.Double alarmLine = new Line2D.Double();
   private Plot plot;
   private RSAMData countedData;
   private int countedThreshold = Integer.MIN_VALUE;
@@ -173,11 +175,14 @@ public class RsamViewPanel extends JComponent implements SettingsListener {
   }
 
   private void createImage() {
-    offscreen.render(this, new Offscreen.Painter() {
-      public void paint(Graphics2D graphics) {
-        constructPlot(graphics);
-      }
-    }, true);
+    if (plotPainter == null) {
+      plotPainter = new Offscreen.Painter() {
+        public void paint(Graphics2D graphics) {
+          constructPlot(graphics);
+        }
+      };
+    }
+    offscreen.render(this, plotPainter, true);
   }
 
   /**
@@ -321,7 +326,8 @@ public class RsamViewPanel extends JComponent implements SettingsListener {
       lr.color = Color.RED;
       lr.stroke = HAIRLINE;
       double y = mr.getYPixel(settings.eventThreshold);
-      lr.line = new Line2D.Double(X_OFFSET, y, this.getWidth() - RIGHT_WIDTH, y);
+      alarmLine.setLine(X_OFFSET, y, this.getWidth() - RIGHT_WIDTH, y);
+      lr.line = alarmLine;
       plot.addRenderer(lr);
 
       // sound audio alarm
