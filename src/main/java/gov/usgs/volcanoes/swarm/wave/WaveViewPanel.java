@@ -50,6 +50,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.TimeZone;
 import javax.swing.JComponent;
@@ -173,6 +174,28 @@ public class WaveViewPanel extends JComponent {
   private int cursorRawOffset;
   private int cursorDstSavings;
   private String cursorText;
+  private final StringBuilder statusBuffer = new StringBuilder(256);
+  private boolean durationTextValid;
+  private long durationMark1Bits;
+  private long durationMark2Bits;
+  private long durationABits;
+  private long durationBBits;
+  private String durationText;
+  private boolean sampleTextValid;
+  private long sampleBits;
+  private String sampleText;
+  private boolean pickStatusValid;
+  private long pickSpBits;
+  private long pickCodaBits;
+  private long pickVpBits;
+  private long pickRatioBits;
+  private long pickDurationABits;
+  private long pickDurationBBits;
+  private boolean pickDurationEnabled;
+  private int pickWaveCount = -2;
+  private double[] pickCodaDurations = new double[0];
+  private double[] codaScratch = new double[0];
+  private String cachedPickStatus = "";
 
   // pick and tag data
   private PickData pickData;
@@ -636,7 +659,7 @@ public class WaveViewPanel extends JComponent {
    * @param y the mouse y position
    */
   public boolean processMousePosition(int x, int y) {
-    StringBuilder status = new StringBuilder();
+    statusBuffer.setLength(0);
     String unit = null;
 
     int panelWidth = getWidth();
@@ -650,20 +673,19 @@ public class WaveViewPanel extends JComponent {
       time = x * t[0] + t[1];
       double yi = y * -t[2] + t[3];
 
-      status.append(cachedWaveInfo());
+      statusBuffer.append(cachedWaveInfo());
 
       if (timeSeries) {
 
         if (swarmConfig.durationEnabled && !Double.isNaN(mark1) && !Double.isNaN(mark2)) {
-          String durationString = StatusTextArea.getDuration(mark1, mark2);
-          status.append(",");
-          status.append(durationString);
+          statusBuffer.append(",");
+          statusBuffer.append(cachedDuration(mark1, mark2));
         }
 
         String timeString = cursorTimeText(time);
         if (timeString != null) {
-          status.append("\n");
-          status.append(timeString);
+          statusBuffer.append("\n");
+          statusBuffer.append(timeString);
         }
 
         double offset = 0;
@@ -684,11 +706,10 @@ public class WaveViewPanel extends JComponent {
           }
         }
         double yi2 = multiplier * yi + offset;
-        double exp = Util.getExp(yi2);
-        String value = (yi2 != 0.0 && (exp >= 5.0 || exp <= -5.0)
-            ? numberFormat.format(yi2 / Math.pow(10, exp)) + "e" + numberFormat.format(exp)
-            : numberFormat.format(yi2));
-        status.append(String.format(", %s: %s", unit, value));
+        statusBuffer.append(", ");
+        statusBuffer.append(unit);
+        statusBuffer.append(": ");
+        statusBuffer.append(formatSample(yi2));
       } else {
         double xi = time;
         if (settings.viewType == ViewType.SPECTRA && settings.spectraLogFreq) {
@@ -697,63 +718,25 @@ public class WaveViewPanel extends JComponent {
         if (settings.viewType == ViewType.SPECTRA && settings.spectraLogPower) {
           yi = Math.pow(10.0, yi);
         }
-        status.append(String.format("\nFrequency (Hz): %.6f, Power: %.3f", xi, yi));
+        statusBuffer.append(String.format("\nFrequency (Hz): %.6f, Power: %.3f", xi, yi));
       }
 
       if (settings.pickEnabled && pickData != null) {
-        String pickStatus = "";
-        // S-P
-        double spDuration = pickData.getSpDuration();
-        if (!Double.isNaN(spDuration)) {
-          double vp = SwarmConfig.getInstance().pVelocity;
-          double vs = vp / SwarmConfig.getInstance().velocityRatio;
-          double spDistance = spDuration * (vp * vs) / (vp - vs);
-          pickStatus = String.format("S-P: %.2fs (%.2fkm)", spDuration, spDistance);
-        }
-        // Coda
-        if (swarmConfig.durationEnabled && !Double.isNaN(pickData.getCodaDuration())) {
-          if (!pickStatus.equals("")) {
-            pickStatus += "; ";
-          }
-          double duration = pickData.getCodaDuration();
-          double durationMagnitude = swarmConfig.getDurationMagnitude(duration);
-          String coda = String.format("Coda: %.2fs (Mc: %.2f)", duration, durationMagnitude);
-
-          // get clipboard average
-          WaveClipboardFrame cb = WaveClipboardFrame.getInstance();
-          int count = 0;
-          double sumDuration = 0;
-          for (WaveViewPanel wvp : cb.getWaves()) {
-            double codaDuration = wvp.pickData.getCodaDuration();
-            if (!Double.isNaN(codaDuration)) {
-              sumDuration += codaDuration;
-              count++;
-            }
-          }
-          if (count == 1) {
-            pickStatus += coda;
-          } else {
-            double avgDuration = sumDuration / count;
-            double avgDurationMagnitude = swarmConfig.getDurationMagnitude(avgDuration);
-            String avgCoda =
-                String.format("Avg Coda: %.2fs (Mc: %.2f)", avgDuration, avgDurationMagnitude);
-
-            // add final coda string
-            pickStatus += coda + ", " + avgCoda;
-          }
-        }
+        String pickStatus = cachedPickStatus();
         if (!pickStatus.isEmpty()) {
-          status.append("\n");
-          status.append(pickStatus);
+          statusBuffer.append("\n");
+          statusBuffer.append(pickStatus);
         }
       }
     }
+
+    // Copy before notifying listeners so a re-entrant hover cannot clear this buffer.
+    final String statusTextValue = statusBuffer.toString();
 
     if (!pauseCursorMark && Double.compare(previousTime, time) != 0) {
       WaveViewTime.fireTimeChanged(time);
     }
 
-    final String statusTextValue = status.toString();
     if (statusText != null) {
       SwingUtilities.invokeLater(new Runnable() {
         public void run() {
@@ -820,6 +803,150 @@ public class WaveViewPanel extends JComponent {
   private String formatCursorEpoch(double j2k) {
     cursorDate.setTime(J2kSec.asEpoch(j2k));
     return cursorFormat.format(cursorDate);
+  }
+
+  /**
+   * Duration text for the current marks. Reused until the marks or magnitude coefficients change.
+   */
+  private String cachedDuration(double start, double end) {
+    long mark1Bits = Double.doubleToLongBits(start);
+    long mark2Bits = Double.doubleToLongBits(end);
+    long aBits = Double.doubleToLongBits(swarmConfig.durationA);
+    long bBits = Double.doubleToLongBits(swarmConfig.durationB);
+    if (!durationTextValid || mark1Bits != durationMark1Bits || mark2Bits != durationMark2Bits
+        || aBits != durationABits || bBits != durationBBits) {
+      durationText = StatusTextArea.getDuration(start, end);
+      durationMark1Bits = mark1Bits;
+      durationMark2Bits = mark2Bits;
+      durationABits = aBits;
+      durationBBits = bBits;
+      durationTextValid = true;
+    }
+    return durationText;
+  }
+
+  /** Count or frequency text. Reused while the scaled sample has the same bits. */
+  private String formatSample(double yi2) {
+    long bits = Double.doubleToLongBits(yi2);
+    if (sampleTextValid && bits == sampleBits) {
+      return sampleText;
+    }
+    double exp = Util.getExp(yi2);
+    if (yi2 != 0.0 && (exp >= 5.0 || exp <= -5.0)) {
+      sampleText = numberFormat.format(yi2 / Math.pow(10, exp)) + "e" + numberFormat.format(exp);
+    } else {
+      sampleText = numberFormat.format(yi2);
+    }
+    sampleBits = bits;
+    sampleTextValid = true;
+    return sampleText;
+  }
+
+  /**
+   * S-P and coda text. The clipboard is still visited so a changed coda cannot be missed, and the
+   * formatted line is reused when that visit sees the same durations and velocities.
+   */
+  private String cachedPickStatus() {
+    double spDuration = pickData.getSpDuration();
+    double codaDuration = pickData.getCodaDuration();
+    double vp = SwarmConfig.getInstance().pVelocity;
+    double ratio = SwarmConfig.getInstance().velocityRatio;
+    boolean durationEnabled = swarmConfig.durationEnabled;
+    double durationA = swarmConfig.durationA;
+    double durationB = swarmConfig.durationB;
+    int waveCount = -1;
+    if (durationEnabled && !Double.isNaN(codaDuration)) {
+      List<WaveViewPanel> waves = WaveClipboardFrame.getInstance().getWaves();
+      waveCount = waves.size();
+      if (codaScratch.length < waveCount) {
+        codaScratch = new double[waveCount];
+      }
+      for (int i = 0; i < waveCount; i++) {
+        codaScratch[i] = waves.get(i).pickData.getCodaDuration();
+      }
+    }
+    if (pickStatusValid && sameBits(spDuration, pickSpBits) && sameBits(codaDuration, pickCodaBits)
+        && sameBits(vp, pickVpBits) && sameBits(ratio, pickRatioBits)
+        && sameBits(durationA, pickDurationABits) && sameBits(durationB, pickDurationBBits)
+        && durationEnabled == pickDurationEnabled && waveCount == pickWaveCount
+        && sameCoda(waveCount)) {
+      return cachedPickStatus;
+    }
+    cachedPickStatus =
+        buildPickStatus(spDuration, codaDuration, vp, ratio, durationEnabled, waveCount);
+    pickSpBits = Double.doubleToLongBits(spDuration);
+    pickCodaBits = Double.doubleToLongBits(codaDuration);
+    pickVpBits = Double.doubleToLongBits(vp);
+    pickRatioBits = Double.doubleToLongBits(ratio);
+    pickDurationABits = Double.doubleToLongBits(durationA);
+    pickDurationBBits = Double.doubleToLongBits(durationB);
+    pickDurationEnabled = durationEnabled;
+    pickWaveCount = waveCount;
+    if (waveCount >= 0) {
+      if (pickCodaDurations.length < waveCount) {
+        pickCodaDurations = new double[waveCount];
+      }
+      System.arraycopy(codaScratch, 0, pickCodaDurations, 0, waveCount);
+    }
+    pickStatusValid = true;
+    return cachedPickStatus;
+  }
+
+  private static boolean sameBits(double value, long bits) {
+    return Double.doubleToLongBits(value) == bits;
+  }
+
+  private boolean sameCoda(int waveCount) {
+    if (waveCount < 0) {
+      return true;
+    }
+    if (pickCodaDurations.length < waveCount) {
+      return false;
+    }
+    for (int i = 0; i < waveCount; i++) {
+      long left = Double.doubleToLongBits(codaScratch[i]);
+      long right = Double.doubleToLongBits(pickCodaDurations[i]);
+      if (left != right) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private String buildPickStatus(double spDuration, double codaDuration, double vp, double ratio,
+      boolean durationEnabled, int waveCount) {
+    String pickStatus = "";
+    if (!Double.isNaN(spDuration)) {
+      double vs = vp / ratio;
+      double spDistance = spDuration * (vp * vs) / (vp - vs);
+      pickStatus = String.format("S-P: %.2fs (%.2fkm)", spDuration, spDistance);
+    }
+    if (durationEnabled && !Double.isNaN(codaDuration)) {
+      if (!pickStatus.equals("")) {
+        pickStatus += "; ";
+      }
+      double durationMagnitude = swarmConfig.getDurationMagnitude(codaDuration);
+      String coda = String.format("Coda: %.2fs (Mc: %.2f)", codaDuration, durationMagnitude);
+      int count = 0;
+      double sumDuration = 0;
+      for (int i = 0; i < waveCount; i++) {
+        double one = codaScratch[i];
+        if (!Double.isNaN(one)) {
+          sumDuration += one;
+          count++;
+        }
+      }
+      if (count == 1) {
+        pickStatus += coda;
+      } else {
+        double avgDuration = sumDuration / count;
+        double avgDurationMagnitude = swarmConfig.getDurationMagnitude(avgDuration);
+        String avgCoda =
+            String.format("Avg Coda: %.2fs (Mc: %.2f)", avgDuration, avgDurationMagnitude);
+        pickStatus += coda + ", " + avgCoda;
+      }
+    }
+    return pickStatus;
   }
 
   /**
