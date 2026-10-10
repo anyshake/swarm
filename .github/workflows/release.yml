@@ -23,7 +23,8 @@ jobs:
           cache: maven
 
       - name: Build and test
-        run: mvn --batch-mode --no-transfer-progress clean package
+        # Published USGS dependency POMs contain invalid repository policies.
+        run: mvn --batch-mode --no-transfer-progress --ignore-transitive-repositories clean package
 
       - name: Publish GitHub Release
         env:
