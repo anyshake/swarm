@@ -43,7 +43,6 @@ import java.awt.event.MouseWheelListener;
 import java.awt.geom.GeneralPath;
 import java.awt.geom.Line2D;
 import java.awt.geom.Rectangle2D;
-import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -758,12 +757,7 @@ public class HelicorderViewPanel extends JComponent implements SwarmOptionsListe
       String[] leftLabelText = new String[numRows];
       String[] rightLabelText = new String[numRows];
       TimeZone timeZone = swarmConfig.getTimeZone(settings.channel);
-
-      DateFormat localTimeFormat = new SimpleDateFormat("HH:mm");
-      localTimeFormat.setTimeZone(timeZone);
-
-      DateFormat localDayFormat = new SimpleDateFormat("MM-dd");
-      localDayFormat.setTimeZone(timeZone);
+      useRowFormats(timeZone);
 
       double pixelsPast = 0;
       double pixelsPerRow = fr.getGraphHeight() / numRows;
@@ -772,7 +766,7 @@ public class HelicorderViewPanel extends JComponent implements SwarmOptionsListe
         pixelsPast += pixelsPerRow;
         labelPosLr[i] = i + 0.5;
 
-        String localTime = localTimeFormat
+        String localTime = rowTimeFormat
             .format(J2kSec.asDate(hr.getHelicorderMaxX() - (i + 1) * settings.timeChunk));
         leftLabelText[i] = null;
         if (pixelsPast > 20) {
@@ -782,7 +776,7 @@ public class HelicorderViewPanel extends JComponent implements SwarmOptionsListe
 
         Date dtz = J2kSec.asDate(hr.getHelicorderMaxX() - (i + 1) * settings.timeChunk);
         String localDay =
-            localDayFormat.format(new Date(dtz.getTime() + settings.timeChunk * 1000));
+            rowDayFormat.format(new Date(dtz.getTime() + settings.timeChunk * 1000));
         if (!localDay.equals(lastLocalDay)) {
           rightLabelText[i] = localDay;
           lastLocalDay = localDay;
@@ -796,7 +790,7 @@ public class HelicorderViewPanel extends JComponent implements SwarmOptionsListe
       String timeZoneName = timeZone.getDisplayName(dst, TimeZone.SHORT);
       TextRenderer tr =
           new TextRenderer(3, fr.getGraphY() + fr.getGraphHeight() + 14, timeZoneName);
-      tr.font = Font.decode("dialog-PLAIN-9");
+      tr.font = ROW_LABEL_FONT;
       tr.antiAlias = false;
       axis.addPostRenderer(tr);
 
@@ -820,6 +814,25 @@ public class HelicorderViewPanel extends JComponent implements SwarmOptionsListe
   }
 
   private static final Color DARK_GREEN = new Color(0, 168, 0);
+  private static final Color INSET_HIGHLIGHT = new Color(255, 255, 0, 128);
+  private static final Font ROW_LABEL_FONT = Font.decode("dialog-PLAIN-9");
+  private SimpleDateFormat rowTimeFormat;
+  private SimpleDateFormat rowDayFormat;
+  private TimeZone rowLabelZone;
+
+  private void useRowFormats(TimeZone timeZone) {
+    if (rowTimeFormat == null) {
+      rowTimeFormat = new SimpleDateFormat("HH:mm");
+      rowDayFormat = new SimpleDateFormat("MM-dd");
+    }
+    if (!timeZone.equals(rowLabelZone)) {
+      rowTimeFormat.setTimeZone(timeZone);
+      rowDayFormat.setTimeZone(timeZone);
+      rowLabelZone = timeZone;
+    }
+  }
+
+  private final GeneralPath markPath = new GeneralPath();
 
   private void drawMark(Graphics2D g2, double t, Color color) {
     if (Double.isNaN(t)) {
@@ -836,22 +849,22 @@ public class HelicorderViewPanel extends JComponent implements SwarmOptionsListe
       g2.setColor(color);
       g2.draw(new Line2D.Double(x, y, x, y + translation[2]));
 
-      GeneralPath gp = new GeneralPath();
-      gp.moveTo(x, y);
-      gp.lineTo((float) x - 4, (float) y - 6);
-      gp.lineTo((float) x + 4, (float) y - 6);
-      gp.closePath();
-      g2.fill(gp);
-      g2.draw(gp);
+      markPath.reset();
+      markPath.moveTo(x, y);
+      markPath.lineTo(x - 4f, y - 6f);
+      markPath.lineTo(x + 4f, y - 6f);
+      markPath.closePath();
+      g2.fill(markPath);
+      g2.draw(markPath);
 
-      gp.reset();
-      gp.moveTo(x, (float) (y + translation[2]));
-      gp.lineTo((float) x - 4, (float) (y + 6 + translation[2]));
-      gp.lineTo((float) x + 4, (float) (y + 6 + translation[2]));
-      gp.closePath();
-      gp.closePath();
-      g2.fill(gp);
-      g2.draw(gp);
+      float base = (float) (y + translation[2]);
+      markPath.reset();
+      markPath.moveTo(x, base);
+      markPath.lineTo(x - 4f, base + 6f);
+      markPath.lineTo(x + 4f, base + 6f);
+      markPath.closePath();
+      g2.fill(markPath);
+      g2.draw(markPath);
     }
   }
 
@@ -953,7 +966,7 @@ public class HelicorderViewPanel extends JComponent implements SwarmOptionsListe
 
       // finally, draw the highlight.
       Paint pnt = g2.getPaint();
-      g2.setPaint(new Color(255, 255, 0, 128));
+      g2.setPaint(INSET_HIGHLIGHT);
       Rectangle2D.Double rect = new Rectangle2D.Double();
 
       int zoomTimeSpan = parent.getHelicorderViewerSettings().waveZoomOffset * 2;

@@ -57,6 +57,8 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
   private static final Color BLUE = new Color(0, 0, 200, 200);
   private static final Color PURPLE = new Color(200, 0, 200, 200);
   private static final Color BLACK = new Color(0, 0, 0, 200);
+  private static final Color POPUP_SHADE = new Color(0, 0, 0, 128);
+  private static final BasicStroke POPUP_STROKE = new BasicStroke(1.2f);
 
   private final Map<String, Event> events;
   private final Map<String, Event> importedEvents;
@@ -246,8 +248,8 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
 
     g2.translate(res.x, res.y);
 
-    g2.setStroke(new BasicStroke(1.2f));
-    g2.setColor(new Color(0, 0, 0, 128));
+    g2.setStroke(POPUP_STROKE);
+    g2.setColor(POPUP_SHADE);
     g2.drawRect(0, -(popupHeight - POPUP_PADDING), popupWidth, popupHeight);
     g2.fillRect(0, -(popupHeight - POPUP_PADDING), popupWidth, popupHeight);
 

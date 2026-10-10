@@ -21,7 +21,7 @@ public class Icons {
   public static final ImageIcon close_view = getIcon("images/closeview.gif");
   public static final ImageIcon delete = getIcon("images/delete.gif");
   public static final ImageIcon deleteall = getIcon("images/deleteall.gif");
-  public static final ImageIcon new_delete = getIcon("images/delete.gif");
+  public static final ImageIcon new_delete = delete;
   public static final ImageIcon gototime = getIcon("images/gototime.gif");
   public static final ImageIcon heli = getIcon("images/helicorder.gif");
   public static final ImageIcon left = getIcon("images/left.gif");
@@ -53,7 +53,7 @@ public class Icons {
   public static final ImageIcon server = getIcon("images/server.gif");
   public static final ImageIcon new_server = getIcon("images/new_server.gif");
   public static final ImageIcon collapse = getIcon("images/collapse.gif");
-  public static final ImageIcon wave_folder = getIcon("images/wave_folder.gif");
+  public static final ImageIcon wave_folder = open;
   public static final ImageIcon warning = getIcon("images/warning.gif");
   public static final ImageIcon broken_server = getIcon("images/broken_server.gif");
   public static final ImageIcon edit_server = getIcon("images/edit_server.gif");

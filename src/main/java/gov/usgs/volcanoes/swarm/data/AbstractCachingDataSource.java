@@ -72,7 +72,6 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
   public void flush() {
     flushWaves();
     flushHelicorders();
-    System.gc();
   }
 
   @Override
