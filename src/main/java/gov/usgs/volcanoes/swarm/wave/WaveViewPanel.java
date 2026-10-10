@@ -1517,11 +1517,11 @@ public class WaveViewPanel extends JComponent {
   }
 
   /**
-   * Smallest power of two greater than or equal to the sample count. Values below 1 keep the
-   * previous log expression so a fractional bin still truncates the same way.
+   * Smallest power of two greater than or equal to the sample count.
    */
   private static int ceilPowerOfTwo(double samples) {
-    if (!(samples >= 1.0) || samples > Integer.MAX_VALUE) {
+    // highestOneBit matches pow(2, ceil(log2)) only through 2^28.
+    if (!(samples >= 1.0) || samples > (1 << 28)) {
       return (int) Math.pow(2.0, Math.ceil(Math.log(samples) / Math.log(2.0)));
     }
     int rounded = (int) Math.ceil(samples);
