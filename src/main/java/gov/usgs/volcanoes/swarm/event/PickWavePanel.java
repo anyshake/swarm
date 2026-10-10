@@ -12,6 +12,7 @@ import java.awt.Color;
 import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics2D;
+import java.awt.Rectangle;
 import java.awt.event.MouseEvent;
 import java.awt.geom.Line2D;
 import java.awt.geom.Rectangle2D;
@@ -37,6 +38,7 @@ public class PickWavePanel extends WaveViewPanel implements EventObserver {
   private final Stack<double[]> zoomHistory;
   private final Line2D.Double arrivalLine = new Line2D.Double();
   private final Rectangle2D.Double residualRect = new Rectangle2D.Double();
+  private final Rectangle visibleArea = new Rectangle();
 
   /**
    * Default constructor.
@@ -74,10 +76,12 @@ public class PickWavePanel extends WaveViewPanel implements EventObserver {
 
   @Override
   protected void annotateImage(Graphics2D g2) {
-    if (getVisibleRect().isEmpty()) {
+    computeVisibleRect(visibleArea);
+    if (visibleArea.isEmpty()) {
       return;
     }
 
+    FontMetrics metrics = null;
     for (Arrival arrival : arrivals) {
       Pick pick = arrival.getPick();
 
@@ -101,12 +105,13 @@ public class PickWavePanel extends WaveViewPanel implements EventObserver {
         g2.fill(residualRect);
       }
 
-      g2.setFont(ANNOTATION_FONT);
-
-      FontMetrics fm = g2.getFontMetrics();
+      if (metrics == null) {
+        g2.setFont(ANNOTATION_FONT);
+        metrics = g2.getFontMetrics();
+      }
       String tag = arrival.getTag();
-      int width = fm.stringWidth(tag);
-      int height = fm.getAscent();
+      int width = metrics.stringWidth(tag);
+      int height = metrics.getAscent();
 
       int offset = 2;
       int lw = width + 2 * offset;
@@ -121,7 +126,7 @@ public class PickWavePanel extends WaveViewPanel implements EventObserver {
       g2.setColor(Color.black);
       g2.drawRect((int) x, 3, lw, height + 2 * offset);
 
-      g2.drawString(tag, (int) x + offset, 3 + (fm.getAscent() + offset));
+      g2.drawString(tag, (int) x + offset, 3 + (metrics.getAscent() + offset));
     }
   }
 
