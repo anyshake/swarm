@@ -80,6 +80,8 @@ public class SeedLinkClient implements Runnable, SwarmConst, TimeConstants {
   private final String[] scnls;
   private DoneListener doneListener = DoneListener.NO_DONE_LISTENER;
   private final Date lastRequestTime = new Date(0L);
+  /** Builds one SCNL key at a time. packetHandler runs on this client's thread. */
+  private final StringBuilder scnlBuffer = new StringBuilder(32);
 
   /**
    * Create SeedLink client with channel.
@@ -190,9 +192,40 @@ public class SeedLinkClient implements Runnable, SwarmConst, TimeConstants {
     if (scnl == null || wave == null) {
       return;
     }
-    CachedDataSource.getInstance().putWave(scnl, wave);
-    CachedDataSource.getInstance().cacheWaveAsHelicorder(scnl, wave);
+    CachedDataSource cache = CachedDataSource.getInstance();
+    cache.putWave(scnl, wave);
+    cache.cacheWaveAsHelicorder(scnl, wave);
     notifyData();
+  }
+
+  /**
+   * SCNL key with the same trim and space-to-dollar replacement as joining the fields on spaces.
+   * The result string is a copy, so the buffer can be reused on the next packet.
+   */
+  private String seedLinkScnl(String station, String channel, String network, String location) {
+    StringBuilder sb = scnlBuffer;
+    sb.setLength(0);
+    sb.append(station);
+    sb.append(' ');
+    sb.append(channel);
+    sb.append(' ');
+    sb.append(network);
+    sb.append(' ');
+    sb.append(location);
+    int start = 0;
+    int end = sb.length();
+    while (start < end && sb.charAt(start) <= ' ') {
+      start++;
+    }
+    while (end > start && sb.charAt(end - 1) <= ' ') {
+      end--;
+    }
+    for (int i = start; i < end; i++) {
+      if (sb.charAt(i) == ' ') {
+        sb.setCharAt(i, '$');
+      }
+    }
+    return sb.substring(start, end);
   }
 
   /**
@@ -241,7 +274,7 @@ public class SeedLinkClient implements Runnable, SwarmConst, TimeConstants {
     }
   };
 
-  private static Date btimeToDate(Btime btime) {
+  private static long btimeToEpochMillis(Btime btime) {
     Calendar cal = GMT_CALENDAR.get();
     cal.clear();
     cal.set(Calendar.YEAR, btime.getYear());
@@ -250,7 +283,7 @@ public class SeedLinkClient implements Runnable, SwarmConst, TimeConstants {
     cal.set(Calendar.MINUTE, btime.getMinute());
     cal.set(Calendar.SECOND, btime.getSecond());
     cal.set(Calendar.MILLISECOND, btime.getTenthMill() / 10);
-    return cal.getTime();
+    return cal.getTimeInMillis();
   }
 
   /**
@@ -304,6 +337,7 @@ public class SeedLinkClient implements Runnable, SwarmConst, TimeConstants {
    * 
    * @param count the packet to process.
    * @param slpack the packet to process.
+   * @param type packet type already read so the blockette exists before the volume counter resets.
    * 
    * @return true if connection to SeedLink server should be closed and session terminated, false
    *         otherwise.
@@ -311,16 +345,13 @@ public class SeedLinkClient implements Runnable, SwarmConst, TimeConstants {
    * @exception implementation dependent
    * 
    */
-  private boolean packetHandler(int count, SLPacket slpack) throws Exception {
+  private boolean packetHandler(int count, SLPacket slpack, int type) throws Exception {
     // may not be on AWT-Event Thread, so do not call any GUI methods
 
     // check if not a complete packet
     if (slpack == null || slpack == SLPacket.SLNOPACKET || slpack == SLPacket.SLERROR) {
       return false; // do not close the connection
     }
-
-    // get basic packet info
-    final int type = slpack.getType();
 
     // process INFO packets here
     // return if unterminated
@@ -353,7 +384,7 @@ public class SeedLinkClient implements Runnable, SwarmConst, TimeConstants {
         final Btime bTime = getBtime(blockette, 8);
         final double factor = getDouble(blockette, 10);
         final double multiplier = getDouble(blockette, 11);
-        final double startTime = J2kSec.fromDate(btimeToDate(bTime));
+        final double startTime = J2kSec.fromEpoch(btimeToEpochMillis(bTime));
         final double samplingRate = getSampleRate(factor, multiplier);
         final Wave wave = new Wave();
         wave.setSamplingRate(samplingRate);
@@ -364,8 +395,7 @@ public class SeedLinkClient implements Runnable, SwarmConst, TimeConstants {
         String station = (String) blockette.getFieldVal(4);
         String location = (String) blockette.getFieldVal(5);
         String channel = (String) blockette.getFieldVal(6);
-        String scnl = station + " " + channel + " " + network + " " + location;
-        scnl = scnl.trim().replace(' ', '$');
+        String scnl = seedLinkScnl(station, channel, network, location);
         cacheWave(scnl, wave);
       } catch (Exception ex) {
         LOGGER.warn("SeedLinkClient packetHandler: could not create wave: {}", this, ex);
@@ -392,12 +422,12 @@ public class SeedLinkClient implements Runnable, SwarmConst, TimeConstants {
       if (slpack != null && slpack != SLPacket.SLTERMINATE) {
         count = 1;
         do {
-          slpack.getType(); // ensure the blockette is created if needed
-          // reset the volume counter
+          // ensure the blockette is created if needed, before the volume counter resets
+          final int packetType = slpack.getType();
           BlocketteDecoratorFactory.reset();
           try {
             // do something with packet
-            boolean terminate = packetHandler(count, slpack);
+            boolean terminate = packetHandler(count, slpack, packetType);
             if (terminate) {
               break;
             }
