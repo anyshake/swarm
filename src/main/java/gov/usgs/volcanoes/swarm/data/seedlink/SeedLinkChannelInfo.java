@@ -9,8 +9,10 @@ import gov.usgs.volcanoes.swarm.data.SeismicDataSource;
 import java.io.Reader;
 import java.io.StringReader;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * SeedLink channel information.
@@ -88,7 +90,7 @@ public class SeedLinkChannelInfo extends AbstractChannelInfo {
         }
         if (station != null && network != null && channel != null && location != null
             && DATA_TYPE.equals(type)) {
-          ChannelUtil.addChannel(channels, SeedLinkChannelInfo.this, getSource());
+          ChannelUtil.addChannel(channels, knownChannels, SeedLinkChannelInfo.this, getSource());
         }
       }
     }
@@ -106,6 +108,9 @@ public class SeedLinkChannelInfo extends AbstractChannelInfo {
   public static final String DATA_TYPE = "D";
 
   private final List<String> channels = new ArrayList<String>();
+
+  /** Formatted SCNL strings already kept in {@link #channels}. */
+  private final Set<String> knownChannels = new HashSet<String>();
 
   /** The data source. */
   private final SeedLinkSource dataSource;

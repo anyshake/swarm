@@ -4,8 +4,10 @@ import gov.usgs.volcanoes.swarm.data.SeismicDataSource;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Channel utility methods.
@@ -25,14 +27,15 @@ public final class ChannelUtil {
    * Add the channel.
    * 
    * @param channels the list of channels.
+   * @param knownChannels formatted SCNL strings already kept in {@code channels}.
    * @param ch the channel information.
    * @param source the seismic data source.
    * @return the channel information text.
    */
-  public static String addChannel(List<String> channels, AbstractChannelInfo ch,
-      SeismicDataSource source) {
+  public static String addChannel(List<String> channels, Set<String> knownChannels,
+      AbstractChannelInfo ch, SeismicDataSource source) {
     final String formattedScnl = ch.getFormattedScnl();
-    if (!channels.contains(formattedScnl)) {
+    if (!knownChannels.contains(formattedScnl)) {
       Metadata md = SwarmConfig.getInstance().getMetadata(formattedScnl, true);
       md.updateLongitude(ch.getLongitude());
       md.updateLatitude(ch.getLatitude());
@@ -45,8 +48,22 @@ public final class ChannelUtil {
       }
       md.source = source;
       channels.add(formattedScnl);
+      knownChannels.add(formattedScnl);
     }
     return formattedScnl;
+  }
+
+  /**
+   * Add the channel, scanning the list when the caller does not keep a membership set.
+   *
+   * @param channels the list of channels.
+   * @param ch the channel information.
+   * @param source the seismic data source.
+   * @return the channel information text.
+   */
+  public static String addChannel(List<String> channels, AbstractChannelInfo ch,
+      SeismicDataSource source) {
+    return addChannel(channels, new HashSet<String>(channels), ch, source);
   }
 
   /**

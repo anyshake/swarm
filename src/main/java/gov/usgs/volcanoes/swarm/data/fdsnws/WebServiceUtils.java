@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URLConnection;
 import java.util.List;
+import java.util.Set;
 import java.util.logging.Level;
 
 import gov.usgs.volcanoes.swarm.ChannelInfo;
@@ -45,12 +46,14 @@ public class WebServiceUtils implements WebServiceConst {
    * Add the channel.
    * 
    * @param channels the list of channels.
+   * @param knownChannels formatted SCNL strings already kept in {@code channels}.
    * @param ch       the channel information.
    * @param source   the seismic data source.
    * @return the channel information text.
    */
-  public static String addChannel(final List<String> channels, final ChannelInfo ch, final SeismicDataSource source) {
-    return ChannelUtil.addChannel(channels, ch, source);
+  public static String addChannel(final List<String> channels, final Set<String> knownChannels,
+      final ChannelInfo ch, final SeismicDataSource source) {
+    return ChannelUtil.addChannel(channels, knownChannels, ch, source);
   }
 
   /**

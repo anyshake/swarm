@@ -1,8 +1,9 @@
 package gov.usgs.volcanoes.swarm.data.fdsnws;
 
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
-
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,10 +71,11 @@ public class WebServicesClient extends AbstractDataRecordClient {
       String wsDataSelectUrl, String wsStationUrl) {
     super(source);
     stationClient = WebServiceStationClientFactory.createClient(wsStationUrl, net, sta, loc, chan);
+    final Set<String> knownChannels = new HashSet<String>();
     final ChannelProcessor channelProcessor = new ChannelProcessor() {
       @Override
       public void processChannel(ChannelInfo ch) {
-        WebServiceUtils.addChannel(stationClient.getChannelList(), ch, source);
+        WebServiceUtils.addChannel(stationClient.getChannelList(), knownChannels, ch, source);
         if (lastStation.compareTo(ch.getStation()) != 0) {
           lastStation = ch.getStation();
           if (numStations > 0) {
