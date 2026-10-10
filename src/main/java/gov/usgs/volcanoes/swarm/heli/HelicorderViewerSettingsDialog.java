@@ -6,7 +6,6 @@ import gov.usgs.volcanoes.core.ui.GridBagHelper;
 import gov.usgs.volcanoes.swarm.Icons;
 import gov.usgs.volcanoes.swarm.Swarm;
 import gov.usgs.volcanoes.swarm.SwarmModalDialog;
-import gov.usgs.volcanoes.swarm.SwingWorker;
 import gov.usgs.volcanoes.swarm.internalframe.SwarmInternalFrames;
 import gov.usgs.volcanoes.swarm.wave.WaveViewSettings;
 import gov.usgs.volcanoes.swarm.wave.WaveViewSettingsDialog;
@@ -288,44 +287,21 @@ public class HelicorderViewerSettingsDialog extends SwarmModalDialog {
     mainPanel.add(dialogPanel, BorderLayout.CENTER);
   }
 
+  // These run on the event thread that delivered the click, not on a new thread per click.
   private void setShowClipEnabled(final boolean b) {
-    SwingWorker worker = new SwingWorker() {
-      public Object construct() {
-        alertClip.setEnabled(b);
-        setAlertClipEnabled(b);
-        return null;
-      }
-
-      public void finished() {}
-    };
-    worker.start();
+    alertClip.setEnabled(b);
+    setAlertClipEnabled(b);
   }
 
   private void setAlertClipEnabled(final boolean b) {
-    SwingWorker worker = new SwingWorker() {
-      public Object construct() {
-        boolean state = showClip.isSelected() && alertClip.isSelected();
-        alertClipTimeout.setEnabled(state);
-        alertClipTimeoutLabel.setEnabled(state);
-        return null;
-      }
-
-      public void finished() {}
-    };
-    worker.start();
+    boolean state = showClip.isSelected() && alertClip.isSelected();
+    alertClipTimeout.setEnabled(state);
+    alertClipTimeoutLabel.setEnabled(state);
   }
 
   private void setAutoScaleEnabled(final boolean b) {
-    SwingWorker worker = new SwingWorker() {
-      public Object construct() {
-        clipValue.setEnabled(!b);
-        barRange.setEnabled(!b);
-        return null;
-      }
-
-      public void finished() {}
-    };
-    worker.start();
+    clipValue.setEnabled(!b);
+    barRange.setEnabled(!b);
   }
 
   /**
