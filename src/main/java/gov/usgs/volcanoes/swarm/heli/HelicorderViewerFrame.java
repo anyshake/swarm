@@ -858,6 +858,25 @@ public class HelicorderViewerFrame extends SwarmFrame implements Kioskable {
     return dataSource;
   }
 
+  // Old naps were min(elapsed, interval) until the gap was strictly past the interval.
+  // 2*interval-elapsed sleeps past that. A backward clock sleeps one interval instead of spinning.
+  private static long refreshSleepMs(final long elapsed, final long intervalMs) {
+    if (elapsed < 0 || elapsed > intervalMs) {
+      return intervalMs;
+    }
+    long total = 0;
+    long cursor = elapsed;
+    while (cursor <= intervalMs) {
+      final long nap = Math.min(cursor, intervalMs);
+      if (nap <= 0) {
+        return total;
+      }
+      total += nap;
+      cursor += nap;
+    }
+    return total;
+  }
+
   private class RefreshThread extends Thread {
     private boolean kill = false;
 
@@ -898,15 +917,12 @@ public class HelicorderViewerFrame extends SwarmFrame implements Kioskable {
         }
 
         try {
-          final long intervalMs = refreshInterval > 0 ? refreshInterval * 1000L : 30_000L;
-          final long elapsed = System.currentTimeMillis() - lastRefreshTime;
           final long sleepMs;
-          if (refreshInterval <= 0 || elapsed > intervalMs) {
-            sleepMs = intervalMs;
-          } else if (elapsed < 0) {
-            sleepMs = intervalMs;
+          if (refreshInterval <= 0) {
+            sleepMs = 30_000L;
           } else {
-            sleepMs = 2 * intervalMs - elapsed;
+            final long elapsed = System.currentTimeMillis() - lastRefreshTime;
+            sleepMs = refreshSleepMs(elapsed, refreshInterval * 1000L);
           }
           Thread.sleep(sleepMs);
         } catch (final Exception e) {
@@ -915,7 +931,8 @@ public class HelicorderViewerFrame extends SwarmFrame implements Kioskable {
 
         final long now = System.currentTimeMillis();
 
-        if (!kill && refreshInterval > 0 && (now - lastRefreshTime) > refreshInterval * 1000) {
+        if (!kill && refreshInterval > 0
+            && (now - lastRefreshTime) > refreshInterval * 1000L) {
           try {
             final double bt = settings.getBottomTime();
             if (dataSource.isActiveSource() && Double.isNaN(bt)) {
