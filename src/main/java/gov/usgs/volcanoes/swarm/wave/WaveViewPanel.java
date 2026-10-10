@@ -148,6 +148,30 @@ public class WaveViewPanel extends JComponent {
     return new Color(color.getRed(), color.getGreen(), color.getBlue(), color.getAlpha() / 2);
   }
 
+  /**
+   * floor(log10) of a finite nonzero double is an integer in this range. Other exponents, including
+   * NaN and infinities, still go through Math.pow.
+   */
+  private static final int POW10_MIN = -324;
+  private static final int POW10_MAX = 308;
+  private static final double[] POW10 = new double[POW10_MAX - POW10_MIN + 1];
+
+  static {
+    for (int exponent = POW10_MIN; exponent <= POW10_MAX; exponent++) {
+      POW10[exponent - POW10_MIN] = Math.pow(10.0, exponent);
+    }
+  }
+
+  private static double pow10(double exp) {
+    if (exp >= POW10_MIN && exp <= POW10_MAX) {
+      int exponent = (int) exp;
+      if ((double) exponent == exp) {
+        return POW10[exponent - POW10_MIN];
+      }
+    }
+    return Math.pow(10.0, exp);
+  }
+
   protected boolean pauseCursorMark;
   protected double time;
   private Wave waveInfoSource;
@@ -833,7 +857,7 @@ public class WaveViewPanel extends JComponent {
     }
     double exp = Util.getExp(yi2);
     if (yi2 != 0.0 && (exp >= 5.0 || exp <= -5.0)) {
-      sampleText = numberFormat.format(yi2 / Math.pow(10, exp)) + "e" + numberFormat.format(exp);
+      sampleText = numberFormat.format(yi2 / pow10(exp)) + "e" + numberFormat.format(exp);
     } else {
       sampleText = numberFormat.format(yi2);
     }
