@@ -125,7 +125,7 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
     int widthPx = panel.getGraphWidth();
     int heightPx = panel.getGraphHeight();
     int insetPx = panel.getInset();
-    final double[] ext = range.getProjectedExtents(projection);
+    final double[] ext = panel.projectedExtents();
     final double dx = (ext[1] - ext[0]);
     final double dy = (ext[3] - ext[2]);
 
@@ -239,7 +239,7 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
 
     eventLonLat.setLocation(origin.getLongitude(), origin.getLatitude());
     final Point2D.Double xy = projection.forward(eventLonLat);
-    final double[] ext = range.getProjectedExtents(projection);
+    final double[] ext = panel.projectedExtents();
     final double dx = (ext[1] - ext[0]);
     final double dy = (ext[3] - ext[2]);
 
@@ -363,7 +363,7 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
     int widthPx = panel.getGraphWidth();
     int heightPx = panel.getGraphHeight();
     int insetPx = panel.getInset();
-    final double[] ext = range.getProjectedExtents(projection);
+    final double[] ext = panel.projectedExtents();
     final double dx = (ext[1] - ext[0]);
     final double dy = (ext[3] - ext[2]);
 

@@ -176,6 +176,10 @@ public class MapPanel extends JPanel {
   private GeoLabelSet labels;
   private GeoRange range;
   private Projection projection;
+  private final Point2D.Double projectionInput = new Point2D.Double();
+  private GeoRange extentsRange;
+  private Projection extentsProjection;
+  private double[] extents;
   private RenderedImage image;
 
   private Point2D.Double center;
@@ -587,6 +591,24 @@ public class MapPanel extends JPanel {
   }
 
   /**
+   * Extents of the current range in projected meters. The array belongs to this panel; callers
+   * must not modify it. A new range or projection object recomputes it.
+   *
+   * @return min x, max x, min y, max y, or null when the map is unset
+   */
+  public double[] projectedExtents() {
+    if (range == null || projection == null) {
+      return null;
+    }
+    if (extents == null || extentsRange != range || extentsProjection != projection) {
+      extents = range.getProjectedExtents(projection);
+      extentsRange = range;
+      extentsProjection = projection;
+    }
+    return extents;
+  }
+
+  /**
    * Get XY location on map.
    * 
    * @param lon longitude in DD
@@ -597,14 +619,14 @@ public class MapPanel extends JPanel {
     if (range == null || projection == null || image == null || renderer == null) {
       return null;
     }
-    final Point2D.Double xy = projection.forward(new Point2D.Double(lon, lat));
-    final double[] ext = range.getProjectedExtents(projection);
+    projectionInput.setLocation(lon, lat);
+    final Point2D.Double xy = projection.forward(projectionInput);
+    final double[] ext = projectedExtents();
     final double dx = (ext[1] - ext[0]);
     final double dy = (ext[3] - ext[2]);
-    final Point2D.Double res = new Point2D.Double();
-    res.x = (((xy.x - ext[0]) / dx) * renderer.getGraphWidth() + INSET);
-    res.y = ((1 - (xy.y - ext[2]) / dy) * renderer.getGraphHeight() + INSET);
-    return res;
+    xy.x = (((xy.x - ext[0]) / dx) * renderer.getGraphWidth() + INSET);
+    xy.y = ((1 - (xy.y - ext[2]) / dy) * renderer.getGraphHeight() + INSET);
+    return xy;
   }
 
   /**
@@ -621,13 +643,14 @@ public class MapPanel extends JPanel {
 
     final int tx = x - INSET;
     final int ty = y - INSET;
-    final double[] ext = range.getProjectedExtents(projection);
+    final double[] ext = projectedExtents();
     final double dx = (ext[1] - ext[0]) / renderer.getGraphWidth();
     final double dy = (ext[3] - ext[2]) / renderer.getGraphHeight();
     final double px = tx * dx + ext[0];
     final double py = ext[3] - ty * dy;
 
-    final Point2D.Double pt = projection.inverse(new Point2D.Double(px, py));
+    projectionInput.setLocation(px, py);
+    final Point2D.Double pt = projection.inverse(projectionInput);
     pt.x = pt.x % 360;
     if (pt.x > 180) {
       pt.x -= 360;

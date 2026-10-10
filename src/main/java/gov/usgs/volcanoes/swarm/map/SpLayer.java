@@ -1,7 +1,5 @@
 package gov.usgs.volcanoes.swarm.map;
 
-import gov.usgs.volcanoes.core.math.proj.GeoRange;
-import gov.usgs.volcanoes.core.math.proj.Projection;
 import gov.usgs.volcanoes.swarm.Metadata;
 import gov.usgs.volcanoes.swarm.SwarmConfig;
 import gov.usgs.volcanoes.swarm.event.PickData;
@@ -98,9 +96,7 @@ public class SpLayer implements MapLayer {
     g2.setClip(clipRect);
 
     // draw
-    GeoRange range = panel.getRange();
-    Projection projection = panel.getProjection();
-    final double[] ext = range.getProjectedExtents(projection);
+    final double[] ext = panel.projectedExtents();
     final double dx = (ext[1] - ext[0]);
     for (Sp sp : spList) {
       Metadata md = SwarmConfig.getInstance().getMetadata(sp.channel);
