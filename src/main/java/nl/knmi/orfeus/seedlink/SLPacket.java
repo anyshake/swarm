@@ -139,6 +139,35 @@ public class SLPacket {
      */
     public int getSequenceNumber() {
 
+        if (slhead == null || slhead.length < SLHEADSIZE || !ASCII_COMPATIBLE
+                || INFOSIGNATURE == null || SIGNATURE == null
+                || INFOSIGNATURE.length() > slhead.length || SIGNATURE.length() > slhead.length
+                || !asciiBytes(slhead, 0, SLHEADSIZE)) {
+            return sequenceNumberLegacy();
+        }
+
+        if (equalsIgnoreCaseAscii(slhead, 0, INFOSIGNATURE)) {
+            return 0;
+        }
+
+        if (!equalsIgnoreCaseAscii(slhead, 0, SIGNATURE)) {
+            return -1;
+        }
+
+        try {
+            return parseAsciiInt(slhead, 2, 6, 16);
+        } catch (NumberFormatException nfe) {
+            String seqstr = new String(slhead, 2, 6);
+            System.out.println("SLPacket.getSequenceNumber(): bad packet sequence number: " + seqstr);
+            return -1;
+        }
+    }
+
+    /**
+     * Original header decode, used when the bytes are not plain ASCII.
+     */
+    private int sequenceNumberLegacy() {
+
         if ((new String(slhead)).substring(0, INFOSIGNATURE.length()).equalsIgnoreCase(INFOSIGNATURE)) {
             return 0;
         }
@@ -167,6 +196,33 @@ public class SLPacket {
      */
     public int getType() throws SeedLinkException {
 
+        if (slhead == null || !ASCII_COMPATIBLE || INFOSIGNATURE == null
+                || slhead.length < INFOSIGNATURE.length()
+                || !asciiBytes(slhead, 0, INFOSIGNATURE.length())) {
+            return typeLegacy();
+        }
+
+        // Check for an INFO packet
+        if (equalsIgnoreCaseAscii(slhead, 0, INFOSIGNATURE)) {
+            // Check if it is terminated
+            if (slhead[SLHEADSIZE - 1] != '*') {
+                return (TYPE_SLINFT);
+            } else {
+                return (TYPE_SLINF);
+            }
+        }
+
+        // assume packet contains single blockette and return its type
+        // NOTE: in libslink, the type of the first "important" blockette is returned
+        return (getBlockette().getType());
+
+    }				// End of sl_packettype()
+
+    /**
+     * Original packet-type decode, used when the header is not plain ASCII.
+     */
+    private int typeLegacy() throws SeedLinkException {
+
         // Check for an INFO packet
         if ((new String(slhead)).substring(0, SLPacket.INFOSIGNATURE.length()).equalsIgnoreCase(SLPacket.INFOSIGNATURE)) {
             // Check if it is terminated
@@ -181,7 +237,7 @@ public class SLPacket {
         // NOTE: in libslink, the type of the first "important" blockette is returned
         return (getBlockette().getType());
 
-    }				// End of sl_packettype()
+    }
 
     /**
      *
@@ -239,5 +295,109 @@ public class SLPacket {
             throw (new SeedLinkException("failed to decode mini-seed record: " + e));
         }
 
+    }
+
+    /**
+     * True when the platform charset decodes every byte below 128 as that same character.
+     * SeedLink headers are ASCII, so the common path can compare bytes instead of building strings.
+     */
+    private static final boolean ASCII_COMPATIBLE = asciiCompatibleCharset();
+
+    private static boolean asciiCompatibleCharset() {
+        byte[] bytes = new byte[128];
+        for (int i = 0; i < bytes.length; i++) {
+            bytes[i] = (byte) i;
+        }
+        String decoded = new String(bytes);
+        if (decoded.length() != bytes.length) {
+            return false;
+        }
+        for (int i = 0; i < bytes.length; i++) {
+            if (decoded.charAt(i) != i) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean asciiBytes(byte[] buf, int offset, int length) {
+        for (int i = 0; i < length; i++) {
+            if ((buf[offset + i] & 0xff) > 0x7f) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Same result as {@code new String(buf, offset, signature.length()).equalsIgnoreCase(signature)}
+     * when those bytes are ASCII and the charset keeps them unchanged.
+     */
+    private static boolean equalsIgnoreCaseAscii(byte[] buf, int offset, String signature) {
+        int length = signature.length();
+        for (int i = 0; i < length; i++) {
+            char left = (char) (buf[offset + i] & 0xff);
+            char right = signature.charAt(i);
+            if (left == right) {
+                continue;
+            }
+            char upperLeft = Character.toUpperCase(left);
+            char upperRight = Character.toUpperCase(right);
+            if (upperLeft == upperRight) {
+                continue;
+            }
+            if (Character.toLowerCase(upperLeft) == Character.toLowerCase(upperRight)) {
+                continue;
+            }
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Same value as {@code Integer.parseInt} for an ASCII byte region.
+     */
+    private static int parseAsciiInt(byte[] buf, int offset, int length, int radix) {
+        if (radix < Character.MIN_RADIX || radix > Character.MAX_RADIX) {
+            throw new NumberFormatException();
+        }
+        int result = 0;
+        boolean negative = false;
+        int i = 0;
+        int limit = -Integer.MAX_VALUE;
+        if (length > 0) {
+            char first = (char) (buf[offset] & 0xff);
+            if (first < '0') {
+                if (first == '-') {
+                    negative = true;
+                    limit = Integer.MIN_VALUE;
+                } else if (first != '+') {
+                    throw new NumberFormatException();
+                }
+                if (length == 1) {
+                    throw new NumberFormatException();
+                }
+                i++;
+            }
+            int multmin = limit / radix;
+            while (i < length) {
+                int digit = Character.digit((char) (buf[offset + i] & 0xff), radix);
+                i++;
+                if (digit < 0) {
+                    throw new NumberFormatException();
+                }
+                if (result < multmin) {
+                    throw new NumberFormatException();
+                }
+                result *= radix;
+                if (result < limit + digit) {
+                    throw new NumberFormatException();
+                }
+                result -= digit;
+            }
+        } else {
+            throw new NumberFormatException();
+        }
+        return negative ? result : -result;
     }
 }

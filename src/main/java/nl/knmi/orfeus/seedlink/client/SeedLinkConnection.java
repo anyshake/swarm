@@ -1634,6 +1634,9 @@ public class SeedLinkConnection {
 
     }    // End of sendData()
 
+    /** Empty read. Callers only inspect the length, so the idle poll can share one array. */
+    private static final byte[] NO_BYTES = new byte[0];
+
     /**
      *
      * Read bytes from the server.
@@ -1648,12 +1651,18 @@ public class SeedLinkConnection {
      */
     public byte[] receiveData(int maxbytes, String code) throws IOException {
 
+        // A positive max with nothing waiting used to allocate that many bytes and throw them away.
+        // The following read still happens only after available() reported data, as before.
+        if (maxbytes > 0 && socketInputStream.available() <= 0) {
+            return NO_BYTES;
+        }
+
         byte[] bytes = new byte[maxbytes];
 
         // read up to maxbytes
         int nbytesread = 0;
         try {
-            if (socketInputStream.available() > 0) {
+            if (maxbytes > 0 || socketInputStream.available() > 0) {
                 nbytesread = socketInputStream.read(bytes);
             }
         } catch (IOException ioe) {
@@ -1665,7 +1674,7 @@ public class SeedLinkConnection {
             sllog.log(true, 1, "[" + code + "] socket.read(): " + nbytesread + ": TCP FIN or EOF received");
             return (null);
         } else if (nbytesread == 0) {
-            return (new byte[0]);
+            return NO_BYTES;
         }
 
         // copy bytes to array of length exactly nbytesread
