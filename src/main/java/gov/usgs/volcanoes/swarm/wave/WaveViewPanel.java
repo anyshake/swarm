@@ -226,6 +226,13 @@ public class WaveViewPanel extends JComponent {
   private boolean sampleTextValid;
   private long sampleBits;
   private String sampleText;
+  private boolean spectraTextValid;
+  private long spectraTimeBits;
+  private long spectraPowerBits;
+  private boolean spectraLogFrequency;
+  private boolean spectraLogPower;
+  private Locale spectraFormatLocale;
+  private String spectraText;
   private boolean pickStatusValid;
   private long pickSpBits;
   private long pickCodaBits;
@@ -753,14 +760,7 @@ public class WaveViewPanel extends JComponent {
         statusBuffer.append(": ");
         statusBuffer.append(formatSample(yi2));
       } else {
-        double xi = time;
-        if (settings.viewType == ViewType.SPECTRA && settings.spectraLogFreq) {
-          xi = Math.pow(10.0, xi);
-        }
-        if (settings.viewType == ViewType.SPECTRA && settings.spectraLogPower) {
-          yi = Math.pow(10.0, yi);
-        }
-        statusBuffer.append(String.format("\nFrequency (Hz): %.6f, Power: %.3f", xi, yi));
+        statusBuffer.append(spectraStatus(time, yi));
       }
 
       if (settings.pickEnabled && pickData != null) {
@@ -880,6 +880,39 @@ public class WaveViewPanel extends JComponent {
     sampleBits = bits;
     sampleTextValid = true;
     return sampleText;
+  }
+
+  /**
+   * Spectra cursor line. Reused while the hovered point, log axes, and format locale stay the same.
+   * {@code -0} and {@code 0} format differently, so the key keeps their distinct bits.
+   */
+  private String spectraStatus(double time, double yi) {
+    boolean logFrequency = settings.viewType == ViewType.SPECTRA && settings.spectraLogFreq;
+    boolean logPower = settings.viewType == ViewType.SPECTRA && settings.spectraLogPower;
+    long timeBits = Double.doubleToLongBits(time);
+    long powerBits = Double.doubleToLongBits(yi);
+    Locale formatLocale = Locale.getDefault(Locale.Category.FORMAT);
+    if (spectraTextValid && timeBits == spectraTimeBits && powerBits == spectraPowerBits
+        && logFrequency == spectraLogFrequency && logPower == spectraLogPower
+        && formatLocale.equals(spectraFormatLocale)) {
+      return spectraText;
+    }
+    double xi = time;
+    if (logFrequency) {
+      xi = Math.pow(10.0, xi);
+    }
+    double power = yi;
+    if (logPower) {
+      power = Math.pow(10.0, power);
+    }
+    spectraText = String.format("\nFrequency (Hz): %.6f, Power: %.3f", xi, power);
+    spectraTimeBits = timeBits;
+    spectraPowerBits = powerBits;
+    spectraLogFrequency = logFrequency;
+    spectraLogPower = logPower;
+    spectraFormatLocale = formatLocale;
+    spectraTextValid = true;
+    return spectraText;
   }
 
   /**
