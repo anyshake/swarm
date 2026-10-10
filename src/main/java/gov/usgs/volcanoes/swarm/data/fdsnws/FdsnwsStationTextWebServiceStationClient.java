@@ -3,6 +3,7 @@ package gov.usgs.volcanoes.swarm.data.fdsnws;
 import java.io.BufferedReader;
 import java.net.URLConnection;
 import java.util.Date;
+import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,6 +12,13 @@ import gov.usgs.volcanoes.swarm.StationInfo;
 
 public class FdsnwsStationTextWebServiceStationClient extends FdsnwsStationWebServiceStationClient {
   private static final Logger LOGGER = LoggerFactory.getLogger(FdsnwsStationTextWebServiceStationClient.class);
+
+  /** The line split text the line patterns were compiled from. */
+  private String patternText;
+  /** Matches a line that starts with the separator. */
+  private Pattern leadingSeparatorPattern;
+  /** Splits a line at the separators. */
+  private Pattern separatorPattern;
 
   /**
    * Create the web service station client.
@@ -71,6 +79,18 @@ public class FdsnwsStationTextWebServiceStationClient extends FdsnwsStationWebSe
   }
 
   /**
+   * Compile the line patterns, again only when the line split text changes.
+   */
+  private void compileLinePatterns() {
+    final String text = getLineSplitText();
+    if (separatorPattern == null || !text.equals(patternText)) {
+      leadingSeparatorPattern = Pattern.compile("^" + text + ".*");
+      separatorPattern = Pattern.compile(text);
+      patternText = text;
+    }
+  }
+
+  /**
    * Process the line.
    * 
    * @param line the line of text containing the channel information.
@@ -82,7 +102,8 @@ public class FdsnwsStationTextWebServiceStationClient extends FdsnwsStationWebSe
     }
 
     // skip line if it starts with the separator
-    if (line.matches("^" + getLineSplitText() + ".*")) {
+    compileLinePatterns();
+    if (leadingSeparatorPattern.matcher(line).matches()) {
       LOGGER.info("skipping line ({})", line);
       return;
     }
@@ -153,6 +174,7 @@ public class FdsnwsStationTextWebServiceStationClient extends FdsnwsStationWebSe
    * @return the channel information.
    */
   protected String[] split(String line) {
-    return line.split(getLineSplitText());
+    compileLinePatterns();
+    return separatorPattern.split(line);
   }
 }
