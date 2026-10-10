@@ -20,6 +20,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -53,6 +54,10 @@ import org.xml.sax.SAXException;
  */
 public class SwarmMenu extends JMenuBar implements InternalFrameListener {
   private static final long serialVersionUID = 1L;
+  private static final URI USER_GUIDE_URI = SwarmUtil
+      .createURI("https://gitlab.com/seismic-software/swarm/-/raw/master/docs/Swarm_User_Guide.pdf");
+  private static final URI VERSION_HISTORY_URI =  SwarmUtil
+      .createURI("https://gitlab.com/seismic-software/swarm/-/raw/master/CHANGES.md");
   private JMenu fileMenu;
   private JMenuItem openFile;
   private JMenuItem closeFiles;
@@ -461,6 +466,37 @@ public class SwarmMenu extends JMenuBar implements InternalFrameListener {
   private void createHelpMenu() {
     helpMenu = new JMenu("Help");
     helpMenu.setMnemonic('H');
+
+    if (SwarmUtil.isBrowseSupported()) {
+      if (USER_GUIDE_URI != null) {
+        final JMenuItem userGuide = new JMenuItem("User Guide");
+        userGuide.addActionListener(new ActionListener() {
+          @Override
+          public void actionPerformed(ActionEvent e) {
+            try {
+              SwarmUtil.browse(USER_GUIDE_URI);
+            } catch (Exception ex) {
+            }
+          }
+        });
+        helpMenu.add(userGuide);
+      }
+
+      if (VERSION_HISTORY_URI != null) {
+        final JMenuItem versionHistory = new JMenuItem("Version History");
+        versionHistory.addActionListener(new ActionListener() {
+          @Override
+          public void actionPerformed(ActionEvent e) {
+            try {
+              SwarmUtil.browse(VERSION_HISTORY_URI);
+            } catch (Exception ex) {
+            }
+          }
+        });
+        helpMenu.add(versionHistory);
+      }
+    }
+
     about = new JMenuItem("About...");
     about.setMnemonic('A');
     aboutDialog = new AboutDialog();
@@ -470,8 +506,8 @@ public class SwarmMenu extends JMenuBar implements InternalFrameListener {
         aboutDialog.setVisible(true);
       }
     });
-
     helpMenu.add(about);
+
     add(helpMenu);
   }
 

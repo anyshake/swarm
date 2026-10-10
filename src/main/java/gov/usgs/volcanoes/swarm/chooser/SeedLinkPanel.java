@@ -40,7 +40,7 @@ public class SeedLinkPanel extends DataSourcePanel {
 
   /**
    * Determines if the OK should be allowed.
-   * 
+   *
    * @return true if allowed, false otherwise.
    */
   public boolean allowOk(boolean edit) {
@@ -81,7 +81,7 @@ public class SeedLinkPanel extends DataSourcePanel {
 
   /**
    * Reset source.
-   * 
+   *
    * @see gov.usgs.volcanoes.swarm.chooser.DataSourcePanel#resetSource(java.lang.String)
    */
   public void resetSource(String source) {

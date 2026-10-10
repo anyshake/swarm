@@ -2,6 +2,7 @@ package gov.usgs.volcanoes.swarm.data;
 
 import gov.usgs.volcanoes.swarm.data.fdsnws.WebServicesSource;
 import gov.usgs.volcanoes.swarm.data.seedlink.SeedLinkSource;
+import gov.usgs.volcanoes.swarm.file.LocalFileSource;
 
 /**
  * Enumerate known types of SeismicDataSources and their short names.
@@ -11,8 +12,8 @@ import gov.usgs.volcanoes.swarm.data.seedlink.SeedLinkSource;
 public enum DataSourceType {
   WAVE_SERVER_V("ws", WaveServerSource.class), WINSTON_WAVE_SERVER("wws",
       WwsSource.class), WINSTON_DIRECT("wwsd", DirectWwsSource.class), CACHE("cache",
-          CachedDataSource.class), FDSN_WS("wsc",
-              WebServicesSource.class), SEED_LINK("sls", SeedLinkSource.class);
+          CachedDataSource.class), FDSN_WS("wsc", WebServicesSource.class), SEED_LINK("sls",
+              SeedLinkSource.class), LOCAL_FILE("lfs", LocalFileSource.class);
 
   public String shortName;
   public Class<? extends SeismicDataSource> seismicDataSource;
@@ -66,13 +67,12 @@ public enum DataSourceType {
    * @return seismic data source
    */
   public static SeismicDataSource parseConfig(String config) {
-    String name = config.substring(0, config.indexOf(";"));
-    config = config.substring(config.indexOf(";") + 1);
-    String type = config.substring(0, config.indexOf(":"));
-    String params = config.substring(config.indexOf(":") + 1);
-
     SeismicDataSource sds = null;
     try {
+      String name = config.substring(0, config.indexOf(";"));
+      config = config.substring(config.indexOf(";") + 1);
+      String type = config.substring(0, config.indexOf(":"));
+      String params = config.substring(config.indexOf(":") + 1);
       DataSourceType dataSourceType = DataSourceType.parse(type);
       sds = dataSourceType.seismicDataSource.newInstance();
       sds.setName(name);

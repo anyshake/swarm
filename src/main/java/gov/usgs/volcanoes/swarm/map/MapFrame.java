@@ -507,12 +507,8 @@ public class MapFrame extends SwarmFrame implements Runnable, Kioskable, SwarmOp
       final BufferedImage image = new BufferedImage(mapPanel.getWidth() - i.left - i.right,
           mapPanel.getHeight() - i.top - i.bottom, BufferedImage.TYPE_4BYTE_ABGR);
       final Graphics g = image.getGraphics();
-      try {
-        g.translate(-i.left, -i.top);
-        mapPanel.paint(g);
-      } finally {
-        g.dispose();
-      }
+      g.translate(-i.left, -i.top);
+      mapPanel.paint(g);
       try {
         final PngEncoderB png = new PngEncoderB(image, false, PngEncoder.FILTER_NONE, 7);
         final FileOutputStream out = new FileOutputStream(f);

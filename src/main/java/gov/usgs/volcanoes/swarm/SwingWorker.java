@@ -1,6 +1,5 @@
 package gov.usgs.volcanoes.swarm;
 
-import java.util.concurrent.CountDownLatch;
 import javax.swing.SwingUtilities;
 
 /**
@@ -13,11 +12,31 @@ import javax.swing.SwingUtilities;
  * 
  * <p>
  * Note that the API changed slightly in the 3rd version: You must now invoke start() on the
- * SwingWorker after creating it. The work runs on a reused thread from {@link Workers}.
+ * SwingWorker after creating it.
  */
 public abstract class SwingWorker {
   private Object value; // see getValue(), setValue()
-  private final CountDownLatch constructed = new CountDownLatch(1);
+
+  /**
+   * Class to maintain reference to current worker thread under separate synchronization control.
+   */
+  private static class ThreadVar {
+    private Thread thread;
+
+    ThreadVar(Thread t) {
+      thread = t;
+    }
+
+    synchronized Thread get() {
+      return thread;
+    }
+
+    synchronized void clear() {
+      thread = null;
+    }
+  }
+
+  private ThreadVar threadVar;
 
   /**
    * Get the value produced by the worker thread, or null if it hasn't been constructed yet.
@@ -45,38 +64,72 @@ public abstract class SwingWorker {
   public void finished() {}
 
   /**
-   * Return the value created by the <code>construct</code> method, waiting for it if needed.
-   * Returns null if the current thread was interrupted before a value was produced.
+   * A new method that interrupts the worker thread. Call this method to force the worker to stop
+   * what it's doing.
+   */
+  public void interrupt() {
+    Thread t = threadVar.get();
+    if (t != null) {
+      t.interrupt();
+    }
+    threadVar.clear();
+  }
+
+  /**
+   * Return the value created by the <code>construct</code> method. Returns null if either the
+   * constructing thread or the current thread was interrupted before a value was produced.
    * 
    * @return the value created by the <code>construct</code> method
    */
   public Object get() {
-    try {
-      constructed.await();
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt(); // propagate
-      return null;
+    while (true) {
+      Thread t = threadVar.get();
+      if (t == null) {
+        return getValue();
+      }
+      try {
+        t.join();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt(); // propagate
+        return null;
+      }
     }
-    return getValue();
+  }
+
+
+  /**
+   * Start a thread that will call the <code>construct</code> method and then exit.
+   */
+  public SwingWorker() {
+    final Runnable doFinished = new Runnable() {
+      public void run() {
+        finished();
+      }
+    };
+
+    Runnable doConstruct = new Runnable() {
+      public void run() {
+        try {
+          setValue(construct());
+        } finally {
+          threadVar.clear();
+        }
+
+        SwingUtilities.invokeLater(doFinished);
+      }
+    };
+
+    Thread t = new Thread(doConstruct);
+    threadVar = new ThreadVar(t);
   }
 
   /**
    * Start the worker thread.
    */
   public void start() {
-    Workers.execute(new Runnable() {
-      public void run() {
-        try {
-          setValue(construct());
-        } finally {
-          constructed.countDown();
-        }
-        SwingUtilities.invokeLater(new Runnable() {
-          public void run() {
-            finished();
-          }
-        });
-      }
-    });
+    Thread t = threadVar.get();
+    if (t != null) {
+      t.start();
+    }
   }
 }

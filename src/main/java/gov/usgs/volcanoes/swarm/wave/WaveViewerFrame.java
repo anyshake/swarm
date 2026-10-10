@@ -54,33 +54,23 @@ public class WaveViewerFrame extends SwarmFrame implements Runnable {
    * Constructor.
    * 
    * @param sds seismic data source
-   * @param ch channel
+   * @param ch  channel
+   * @param cf  the config file or null if none
    */
-  public WaveViewerFrame(final SeismicDataSource sds, final String ch) {
-    this(sds, ch, null);
-  }
-
-  /**
-   * Constructor.
-   * 
-   * @param sds seismic data source
-   * @param ch channel
-   * @param settings wave view settings
-   */
-  public WaveViewerFrame(final SeismicDataSource sds, final String ch, WaveViewSettings settings) {
+  public WaveViewerFrame(final SeismicDataSource sds, final String ch, ConfigFile cf) {
     super(ch + ", [" + sds + "]", true, true, false, true);
     dataSource = sds;
     channel = ch;
-    if (settings == null) {
-      this.settings = new WaveViewSettings();
-    } else {
-      this.settings = settings;
+    settings = new WaveViewSettings();
+    if (cf != null) {
+      settings.set(cf);
     }
     spanIndex = 3;
     kill = false;
     updateThread = new Thread(this, "WaveViewerFrame-" + sds + "-" + ch);
     createUi();
     updateThread.start();
+    processStandardLayout(cf);
   }
 
   /**
@@ -200,7 +190,7 @@ public class WaveViewerFrame extends SwarmFrame implements Runnable {
    * @see java.lang.Runnable#run()
    */
   public void run() {
-    while (!kill) {
+    while (!kill && dataSource.allowRealtime()) {
       try {
         getWave();
         Thread.sleep(interval);

@@ -10,7 +10,6 @@ import gov.usgs.volcanoes.core.data.RSAMData;
 import gov.usgs.volcanoes.core.data.Wave;
 import gov.usgs.volcanoes.swarm.Swarm;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -18,7 +17,6 @@ import java.util.Map;
 import javax.swing.JFrame;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import cern.colt.matrix.DoubleFactory2D;
 import cern.colt.matrix.DoubleMatrix2D;
 
 /**
@@ -36,19 +34,10 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
   /** roughly max size of a single wave in bytes. Actually, (numSamples * 4) */
   private static final int MAX_WAVE_SIZE = 1000000;
 
-  /** microsecond conversion. */
-  protected static final long TO_USEC = (long) 1E6;
-
-  /** microsecond conversion. */
-  protected static final double FROM_USEC = 1E-6;
-
   protected long maxSize;
   protected Map<String, List<CachedHelicorder>> helicorderCache;
   protected Map<String, List<CachedWave>> waveCache;
   protected Map<String, List<CachedRsam>> rsamCache;
-  private long waveBytes;
-  private long heliBytes;
-  private long rsamBytes;
   protected CachePurgeAction[] purgeActions;
   protected static Logger logger;
   protected static final JFrame applicationFrame = Swarm.getApplicationFrame();
@@ -72,9 +61,10 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
   /**
    * Flush.
    */
-  public synchronized void flush() {
+  public void flush() {
     flushWaves();
     flushHelicorders();
+    System.gc();
   }
 
   @Override
@@ -88,7 +78,10 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
    * @return
    */
   public synchronized long getSize() {
-    return waveBytes + heliBytes + rsamBytes;
+    long size = getSize(waveCache);
+    size += getSize(helicorderCache);
+    size += getSize(rsamCache);
+    return size;
   }
 
   private synchronized <T extends CacheEntry> long getSize(final Map<String, List<T>> cache) {
@@ -193,7 +186,6 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
     cw.wave = wave;
     cw.lastAccess = System.currentTimeMillis();
     waves.add(cw);
-    waveBytes += cw.getMemorySize();
     enforceSize();
   }
 
@@ -203,7 +195,7 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
    * @param station channel
    * @param rsamData rsam data
    */
-  public synchronized void putRsam(final String station, RSAMData rsamData) {
+  public void putRsam(final String station, RSAMData rsamData) {
     if (rsamData == null || rsamData.getData() == null) {
       return;
     }
@@ -219,7 +211,6 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
       cr.lastAccess = System.currentTimeMillis();
       rsams.add(cr);
       rsamCache.put(station, rsams);
-      rsamBytes += cr.getMemorySize();
       enforceSize();
     } else {
       boolean add = true;
@@ -227,7 +218,6 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
         final CachedRsam ch = rsams.get(i);
         if (ch.rsamData.overlaps(rsamData) && rsamData != ch.rsamData) {
           rsams.remove(ch);
-          rsamBytes -= ch.getMemorySize();
           final RSAMData newRsam = ch.rsamData.combine(rsamData);
           putRsam(station, newRsam);
           rsamData = newRsam;
@@ -244,7 +234,6 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
         ch.rsamData = rsamData;
         ch.lastAccess = System.currentTimeMillis();
         rsams.add(ch);
-        rsamBytes += ch.getMemorySize();
         enforceSize();
       }
     }
@@ -268,7 +257,6 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
       ch.lastAccess = System.currentTimeMillis();
       helis.add(ch);
       helicorderCache.put(station, helis);
-      heliBytes += ch.getMemorySize();
       enforceSize();
     } else {
       boolean add = true;
@@ -276,12 +264,10 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
         final CachedHelicorder ch = helis.get(i);
 
         if (ch.helicorder.overlaps(helicorder)) {
-          final long before = ch.getMemorySize();
           final HelicorderData newHeli = ch.helicorder.combine(helicorder);
           ch.t1 = newHeli.getStartTime();
           ch.t2 = newHeli.getEndTime();
           ch.helicorder = newHeli;
-          heliBytes += ch.getMemorySize() - before;
           ch.lastAccess = System.currentTimeMillis();
 
           helicorder = newHeli;
@@ -299,7 +285,6 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
         ch.helicorder = helicorder;
         ch.lastAccess = System.currentTimeMillis();
         helis.add(ch);
-        heliBytes += ch.getMemorySize();
         enforceSize();
       }
     }
@@ -315,53 +300,20 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
     if (inHelicorderCache(station, wave.getStartTime(), wave.getEndTime())) {
       return;
     }
+    createHelicorderData(station, wave);
+  }
 
-    final int seconds = (int) Math.ceil(wave.numSamples() * wave.getSamplingPeriod());
-    final double[] times = new double[seconds];
-    final int[] minima = new int[seconds];
-    final int[] maxima = new int[seconds];
-    Arrays.fill(minima, Integer.MAX_VALUE);
-    Arrays.fill(maxima, Integer.MIN_VALUE);
-
-    final long sPeriod = (long) (wave.getSamplingPeriod() * TO_USEC);
-    final long startTime = (long) (wave.getStartTime() * TO_USEC);
-    final int[] samples = wave.buffer;
-    final int sampleCount = wave.numSamples();
-    for (int sampleIndex = 0; sampleIndex < sampleCount; sampleIndex++) {
-      final int sample = samples[sampleIndex];
-      if (sample == Wave.NO_DATA) {
-        continue;
-      }
-      final long sampleTime = startTime + sampleIndex * sPeriod;
-      final int secondIndex = (int) ((sampleTime - startTime) / TO_USEC);
-      times[secondIndex] = sampleTime / TO_USEC;
-      if (sample < minima[secondIndex]) {
-        minima[secondIndex] = sample;
-      }
-      if (sample > maxima[secondIndex]) {
-        maxima[secondIndex] = sample;
-      }
-    }
-
-    boolean needsMean = false;
-    for (int i = 0; i < seconds; i++) {
-      if (minima[i] == Integer.MAX_VALUE || maxima[i] == Integer.MIN_VALUE) {
-        needsMean = true;
-        break;
-      }
-    }
-    final double mean = needsMean ? wave.mean() : 0;
-
-    final DoubleMatrix2D data = DoubleFactory2D.dense.make(seconds, 3);
-    for (int i = 0; i < seconds; i++) {
-      data.setQuick(i, 0, times[i]);
-      data.setQuick(i, 1, minima[i] == Integer.MAX_VALUE ? mean : minima[i]);
-      data.setQuick(i, 2, maxima[i] == Integer.MIN_VALUE ? mean : maxima[i]);
-    }
-
-    final HelicorderData hd = new HelicorderData();
-    hd.setData(data);
-    putHelicorder(station, hd);
+  /**
+   * Create helicorder data from wave.
+   *
+   * @param station channel
+   * @param wave    wave data
+   * @return the helicorder data
+   */
+  public HelicorderData createHelicorderData(final String station, final Wave wave) {
+    HelicorderData helicorder = createHelicorderData(wave);
+    putHelicorder(station, helicorder);
+    return helicorder;
   }
 
   public boolean isEmpty() {
@@ -519,11 +471,9 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
         }
 
         if (join) {
-          final long before = cw.getMemorySize();
           final Wave newWave = cw.wave.combine(wave);
           if (newWave != null) {
             waves.remove(cw);
-            waveBytes -= before;
             putWave(station, newWave);
           }
           return;
@@ -659,15 +609,13 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
     return null;
   }
 
-  private synchronized void flushHelicorders() {
+  private void flushHelicorders() {
     helicorderCache.clear();// = new HashMap();
-    heliBytes = 0;
     System.out.println("Helicorder Cache Flushed");
   }
 
-  private synchronized void flushWaves() {
+  private void flushWaves() {
     waveCache.clear();// = new HashMap();
-    waveBytes = 0;
     System.out.println("Wave Cache Flushed");
   }
 
@@ -691,17 +639,8 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
   private synchronized <T extends CacheEntry> void removeEntryFromCache(final CacheEntry ce,
       final Map<String, List<T>> cache) {
     final List<T> cl = cache.get(ce.station);
-    // Identity check; the generic maps are not comparable with ==.
-    final Object cacheMap = cache;
-    if (cacheMap == waveCache) {
-      waveBytes -= ce.getMemorySize();
-    } else if (cacheMap == helicorderCache) {
-      heliBytes -= ce.getMemorySize();
-    } else if (cacheMap == rsamCache) {
-      rsamBytes -= ce.getMemorySize();
-    }
     cl.remove(ce);
-    LOGGER.debug("Removed: {}", ce.getInfoString());
+    System.out.println("Removed: " + ce.getInfoString());
   }
 
   private class HalveLargeWavesPurgeAction extends CachePurgeAction {
@@ -728,9 +667,7 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
           cw.wave = cw.wave.subset(nst, cw.wave.getEndTime());
           cw.t1 = cw.wave.getStartTime();
           cw.t2 = cw.wave.getEndTime();
-          final long delta = cw.getMemorySize() - before;
-          waveBytes += delta;
-          chunk += delta;
+          chunk += cw.getMemorySize() - before;
         }
       }
       return chunk;
@@ -884,7 +821,7 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
 
     /**
      * Slice.
-     * 
+     *
      * @param t1 start time
      * @param t2 end time
      * @return RSAM data
@@ -947,7 +884,6 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
     public long purge() {
       final long size = getSize(cache);
       cache.clear();// = new HashMap();
-      waveBytes = 0;
       return size;
     }
   }
@@ -963,7 +899,6 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
     public long purge() {
       final long size = getSize(cache);
       cache.clear();// = new HashMap();
-      heliBytes = 0;
       return size;
     }
   }

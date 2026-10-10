@@ -60,8 +60,6 @@ public class MapMiniPanel extends JComponent
   private int labelHeight = 13;
   private int labelFontSize = 10;
   private int timeFontSize = 10;
-  private Font boldLabelFont;
-  private int boldLabelSize = -1;
   private static final int[] SIZES =
       new int[] { 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700 };
   private int sizeIndex = 3;
@@ -71,9 +69,6 @@ public class MapMiniPanel extends JComponent
   private WaveViewPanel wavePanel;
   private boolean waveVisible = false;
   private Line2D.Double line;
-  private final Line2D.Double[] anchorLines = new Line2D.Double[] {new Line2D.Double(),
-      new Line2D.Double(), new Line2D.Double(), new Line2D.Double(), new Line2D.Double(),
-      new Line2D.Double(), new Line2D.Double(), new Line2D.Double()};
   private int labelWidth = 1;
   private JLabel close;
 
@@ -548,19 +543,11 @@ public class MapMiniPanel extends JComponent
 
     super.paint(g);
 
-    Font font = boldLabelFont();
+    Font font = Font.decode("dialog-BOLD-" + labelFontSize);
     g2.setFont(font);
     g2.setColor(Color.BLACK);
     g2.drawString(label, 2, labelFontSize);
     g2.drawRect(0, 0, getWidth() - 1, getHeight() - 1);
-  }
-
-  private Font boldLabelFont() {
-    if (boldLabelFont == null || boldLabelSize != labelFontSize) {
-      boldLabelFont = Font.decode("dialog-BOLD-" + labelFontSize);
-      boldLabelSize = labelFontSize;
-    }
-    return boldLabelFont;
   }
 
   protected void determineSelection(MouseEvent e) {
@@ -672,20 +659,19 @@ public class MapMiniPanel extends JComponent
   public void adjustLine() {
     Point p = getLocation();
     Dimension d = getSize();
-    double x2 = line.x2;
-    double y2 = line.y2;
-    anchorLines[0].setLine(p.x, p.y, x2, y2);
-    anchorLines[1].setLine(p.x + d.width - 1, p.y, x2, y2);
-    anchorLines[2].setLine(p.x + d.width - 1, p.y + d.height, x2, y2);
-    anchorLines[3].setLine(p.x, p.y + d.height, x2, y2);
-    anchorLines[4].setLine(p.x + d.width / 2, p.y + d.height, x2, y2);
-    anchorLines[5].setLine(p.x + d.width / 2, p.y, x2, y2);
-    anchorLines[6].setLine(p.x + d.width - 1, p.y + d.height / 2, x2, y2);
-    anchorLines[7].setLine(p.x, p.y + d.height / 2, x2, y2);
+    Line2D.Double[] lines = new Line2D.Double[8];
+    lines[0] = new Line2D.Double(p.x, p.y, line.x2, line.y2);
+    lines[1] = new Line2D.Double(p.x + d.width - 1, p.y, line.x2, line.y2);
+    lines[2] = new Line2D.Double(p.x + d.width - 1, p.y + d.height, line.x2, line.y2);
+    lines[3] = new Line2D.Double(p.x, p.y + d.height, line.x2, line.y2);
+    lines[4] = new Line2D.Double(p.x + d.width / 2, p.y + d.height, line.x2, line.y2);
+    lines[5] = new Line2D.Double(p.x + d.width / 2, p.y, line.x2, line.y2);
+    lines[6] = new Line2D.Double(p.x + d.width - 1, p.y + d.height / 2, line.x2, line.y2);
+    lines[7] = new Line2D.Double(p.x, p.y + d.height / 2, line.x2, line.y2);
     double min = Double.MAX_VALUE;
     Line2D.Double shortest = null;
-    for (int i = 0; i < anchorLines.length; i++) {
-      Line2D.Double l = anchorLines[i];
+    for (int i = 0; i < lines.length; i++) {
+      Line2D.Double l = lines[i];
       double len = (l.x1 - l.x2) * (l.x1 - l.x2) + (l.y1 - l.y2) * (l.y1 - l.y2);
       if (len < min) {
         min = len;
@@ -719,7 +705,6 @@ public class MapMiniPanel extends JComponent
   // TODO: could be singleton to reduce garbage
   private class MapWaveDecorator extends FrameDecorator {
     private Font font;
-    private int plainSize = -1;
     private FontRenderContext frc = new FontRenderContext(new AffineTransform(), false, false);
 
     public MapWaveDecorator() {}
@@ -857,10 +842,7 @@ public class MapMiniPanel extends JComponent
     }
 
     public void decorate(FrameRenderer fr) {
-      if (font == null || plainSize != timeFontSize) {
-        font = Font.decode("dialog-PLAIN-" + timeFontSize);
-        plainSize = timeFontSize;
-      }
+      font = Font.decode("dialog-PLAIN-" + timeFontSize);
       switch (wavePanel.getSettings().viewType) {
         case WAVE:
           decorateWave(fr);

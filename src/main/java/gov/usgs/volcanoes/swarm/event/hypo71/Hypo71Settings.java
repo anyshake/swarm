@@ -100,6 +100,7 @@ public class Hypo71Settings extends Properties {
    * 
    * @see java.util.Hashtable#keys()
    */
+  @SuppressWarnings({ "unchecked", "rawtypes" })
   public Enumeration keys() {
     Enumeration<Object> keysEnum = super.keys();
     Vector<String> keyList = new Vector<String>();

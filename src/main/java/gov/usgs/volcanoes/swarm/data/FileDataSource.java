@@ -166,10 +166,8 @@ public class FileDataSource extends AbstractCachingDataSource {
             updateChannelTimes(channel, wave.getStartTime(), wave.getEndTime());
             progress += progressInc;
             fireChannelsProgress(fileName, progress);
-            if(wave.buffer.length > 0) {
-              cacheWaveAsHelicorder(channel, wave);
-              putWave(channel, wave);
-            }
+            cacheWaveAsHelicorder(channel, wave);
+            putWave(channel, wave);
           }
 
           swarmConfig.assignMetadataSource(file.getChannels(), FileDataSource.this);

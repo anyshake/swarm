@@ -32,10 +32,6 @@ public class SpLayer implements MapLayer {
   private static final BasicStroke solid =
       new BasicStroke(1.0f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER);
 
-  private Color lineColor;
-  private int cachedLineColor = Integer.MIN_VALUE;
-  private final Rectangle2D.Double clipRect = new Rectangle2D.Double();
-
   /**
    * Constructor.
    */
@@ -75,12 +71,7 @@ public class SpLayer implements MapLayer {
     Color color = g2.getColor();
     Stroke stroke = g2.getStroke();
     Shape clip = g2.getClip();
-    int rgb = SwarmConfig.getInstance().mapLineColor;
-    if (lineColor == null || rgb != cachedLineColor) {
-      lineColor = new Color(rgb);
-      cachedLineColor = rgb;
-    }
-    g2.setColor(lineColor);
+    g2.setColor(new Color(SwarmConfig.getInstance().mapLineColor));
 
     // First get updated list of S-P
     Vector<Sp> spList = updateSpList();
@@ -94,8 +85,8 @@ public class SpLayer implements MapLayer {
     int widthPx = panel.getGraphWidth();
     int heightPx = panel.getGraphHeight();
     int inset = panel.getInset();
-    clipRect.setRect(inset, inset, widthPx, heightPx);
-    g2.setClip(clipRect);
+    Rectangle2D rectangle = new Rectangle2D.Double(inset, inset, widthPx, heightPx);
+    g2.setClip(rectangle);
 
     // draw
     GeoRange range = panel.getRange();

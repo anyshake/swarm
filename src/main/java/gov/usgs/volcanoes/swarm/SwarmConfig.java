@@ -36,10 +36,7 @@ public class SwarmConfig {
   private final List<ConfigListener> listeners;
 
   private static String[] DEFAULT_SERVERS =
-      new String[] { "AVO Winston;wws:pubavo1.wr.usgs.gov:16022:10000:1"
-      // "IRIS DMC - New
-      // Zealand;dhi:edu/iris/dmc:IRIS_NetworkDC:edu/iris/dmc:IRIS_BudDataCenter:NZ:3600:1000"
-      };
+      new String[] { "EarthScope DMC;sls:rtserve.iris.washington.edu:18000" };
 
   private static String DEFAULT_CONFIG_FILE = "Swarm.config";
   private static String DEFAULT_DATA_SOURCES_FILE = "DataSources.config";
@@ -489,7 +486,7 @@ public class SwarmConfig {
   }
 
   public double getDurationMagnitude(final double t) {
-    return durationA * Math.log10(t) + durationB;
+    return durationA * (Math.log(t) / Math.log(10)) + durationB;
   }
 
   /**

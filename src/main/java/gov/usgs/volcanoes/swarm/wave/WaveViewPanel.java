@@ -17,7 +17,6 @@ import gov.usgs.volcanoes.core.time.J2kSec;
 import gov.usgs.volcanoes.quakeml.Pick;
 import gov.usgs.volcanoes.swarm.Icons;
 import gov.usgs.volcanoes.swarm.Metadata;
-import gov.usgs.volcanoes.swarm.Offscreen;
 import gov.usgs.volcanoes.swarm.SwarmConfig;
 import gov.usgs.volcanoes.swarm.SwingWorker;
 import gov.usgs.volcanoes.swarm.data.CachedDataSource;
@@ -118,8 +117,6 @@ public class WaveViewPanel extends JComponent {
    * efficiency.
    */
   protected BufferedImage image;
-  private final transient Offscreen offscreen = new Offscreen();
-  private Plot plot;
   protected double mark1 = Double.NaN;
   protected double mark2 = Double.NaN;
   protected double cursorMark = Double.NaN;
@@ -127,34 +124,9 @@ public class WaveViewPanel extends JComponent {
   protected Color borderColor;
   protected static final Color DARK_RED = new Color(168, 0, 0);
   protected static final Color DARK_GREEN = new Color(0, 168, 0);
-  private static final Color DRAG_HIGHLIGHT = new Color(255, 255, 0, 128);
-  private static final String[] PICK_PHASES = {PickData.P, PickData.S};
-  private static final String[] CODA_PHASES = {PickData.CODA1, PickData.CODA2};
-  private static final Color UNCERTAINTY_GRAY = halfAlpha(Color.GRAY);
-  private static final Color UNCERTAINTY_P = halfAlpha(PickWavePanel.P_BACKGROUND);
-  private static final Color UNCERTAINTY_S = halfAlpha(PickWavePanel.S_BACKGROUND);
-  private static final Color UNCERTAINTY_CODA = halfAlpha(Color.YELLOW);
-  private final Line2D.Double overlayLine = new Line2D.Double();
-  private final GeneralPath markPath = new GeneralPath();
-
-  /** Same RGB with alpha divided by two, matching the previous per-paint constructor. */
-  private static Color halfAlpha(Color color) {
-    return new Color(color.getRed(), color.getGreen(), color.getBlue(), color.getAlpha() / 2);
-  }
 
   protected boolean pauseCursorMark;
   protected double time;
-  private Wave waveInfoSource;
-  private String waveInfoText;
-  private Wave filteredSource;
-  private Wave filteredWave;
-  private int[] filteredBuffer;
-  private boolean filteredZeroPhase;
-  private int filteredOrder = Integer.MIN_VALUE;
-  private Object filteredType;
-  private double filteredCorner1 = Double.NaN;
-  private double filteredCorner2 = Double.NaN;
-  private double filteredRate = Double.NaN;
 
   // pick and tag data
   private PickData pickData;
@@ -415,7 +387,6 @@ public class WaveViewPanel extends JComponent {
       }
 
       public void mouseExited(MouseEvent e) {
-        time = Double.NaN;
         WaveViewTime.fireTimeChanged(Double.NaN);
         pauseCursorMark = false;
         dragging = false;
@@ -616,12 +587,11 @@ public class WaveViewPanel extends JComponent {
    * @param y the mouse y position
    */
   public boolean processMousePosition(int x, int y) {
-    StringBuilder status = new StringBuilder();
+    StringBuffer status = new StringBuffer();
     String unit = null;
 
     Dimension size = getSize();
     double[] t = getTranslation();
-    double previousTime = time;
     time = Double.NaN;
 
     if (wave != null && t != null && y > yOffset && y < (size.height - bottomHeight) && x > xOffset
@@ -629,7 +599,7 @@ public class WaveViewPanel extends JComponent {
       time = x * t[0] + t[1];
       double yi = y * -t[2] + t[3];
 
-      status.append(cachedWaveInfo());
+      status.append(StatusTextArea.getWaveInfo(wave));
 
       if (timeSeries) {
 
@@ -721,38 +691,27 @@ public class WaveViewPanel extends JComponent {
             pickStatus += coda + ", " + avgCoda;
           }
         }
-        if (!pickStatus.isEmpty()) {
+        if (!pickStatus.equals(new String(""))) {
           status.append("\n");
           status.append(pickStatus);
         }
       }
     }
 
-    if (!pauseCursorMark && Double.compare(previousTime, time) != 0) {
+    if (!pauseCursorMark) {
       WaveViewTime.fireTimeChanged(time);
     }
 
-    final String statusTextValue = status.toString();
-    if (statusText != null) {
+    if (status != null && statusText != null) {
+      final String st = status.toString();
       SwingUtilities.invokeLater(new Runnable() {
         public void run() {
-          statusText.setText(statusTextValue);
+          statusText.setText(st);
         }
       });
     }
 
-    return !statusTextValue.equals(" ");
-  }
-
-  /**
-   * Wave header for the status bar. Sample range and RSAM stay fixed until the wave object changes.
-   */
-  private String cachedWaveInfo() {
-    if (wave != waveInfoSource) {
-      waveInfoSource = wave;
-      waveInfoText = StatusTextArea.getWaveInfo(wave);
-    }
-    return waveInfoText;
+    return !status.toString().equals(new String(" "));
   }
 
   /**
@@ -764,7 +723,6 @@ public class WaveViewPanel extends JComponent {
    */
   public void setWave(Wave sw, double st, double et) {
     wave = sw;
-    waveInfoSource = null;
     startTime = st;
     endTime = et;
     processSettings();
@@ -804,22 +762,31 @@ public class WaveViewPanel extends JComponent {
     if (settings.viewType == ViewType.SPECTRA) {
       settings.autoScaleSpectraPower = false;
       double maxf = settings.spectraMaxFreq * pct;
+      System.out.printf("WaveViewPanel(804): maxf = %f\n", maxf);
       settings.spectraMaxFreq =
           (maxf > wave.getSamplingRate() / 2) ? wave.getSamplingRate() / 2 : maxf;
+      System.out.printf("WaveViewPanel(806): settings.spectraMaxFreq = %f\n",
+          settings.spectraMaxFreq);
     }
     
     if (settings.viewType == ViewType.SPECTROGRAM) {
       settings.autoScaleSpectrogramPower = false;
       double maxf = settings.spectrogramMaxFreq * pct;
+      System.out.printf("WaveViewPanel(804): maxf = %f\n", maxf);
       settings.spectrogramMaxFreq =
           (maxf > wave.getSamplingRate() / 2) ? wave.getSamplingRate() / 2 : maxf;
+      System.out.printf("WaveViewPanel(806): settings.spectrogramMaxFreq = %f\n",
+          settings.spectrogramMaxFreq);
     }
 
     processSettings();
   }
 
+  private synchronized void setImage(BufferedImage bi) {
+    image = bi;
+  }
+
   private synchronized BufferedImage getImage() {
-    image = offscreen.displayed();
     return image;
   }
 
@@ -827,11 +794,34 @@ public class WaveViewPanel extends JComponent {
    * Create image.
    */
   public void createImage() {
-    offscreen.render(this, new Offscreen.Painter() {
-      public void paint(Graphics2D graphics) {
-        constructPlot(graphics);
+    final Runnable r = new Runnable() {
+      public void run() {
+        if (getWidth() > 0 && getHeight() > 0) {
+          BufferedImage bi =
+              new BufferedImage(getWidth(), getHeight(), BufferedImage.TYPE_4BYTE_ABGR);
+          Graphics2D ig = (Graphics2D) bi.getGraphics();
+          constructPlot(ig);
+          setImage(bi);
+        }
       }
-    }, true);
+    };
+
+    if (SwingUtilities.isEventDispatchThread()) {
+      SwingWorker worker = new SwingWorker() {
+        public Object construct() {
+          r.run();
+          return null;
+        }
+
+        public void finished() {
+          repaint();
+        }
+      };
+      worker.start();
+    } else {
+
+      r.run();
+    }
   }
 
   /**
@@ -878,12 +868,12 @@ public class WaveViewPanel extends JComponent {
         return;
       }
       if (!pickData.isHidePhases()) {
-        for (String phase : PICK_PHASES) {
+        for (String phase : new String[] { PickData.P, PickData.S }) {
           drawPick(pickData.getPick(phase), g2, !pickData.isPickChannel(phase));
         }
       }
       if (!pickData.isHideCoda()) {
-        for (String coda : CODA_PHASES) {
+        for (String coda : new String[] { PickData.CODA1, PickData.CODA2 }) {
           drawPick(pickData.getPick(coda), g2, false);
         }
       }
@@ -969,18 +959,17 @@ public class WaveViewPanel extends JComponent {
 
     double x = (j2k - t[1]) / t[0];
     g2.setColor(DARK_GREEN);
-    overlayLine.setLine(x, yOffset, x, getHeight() - bottomHeight - 1);
-    g2.draw(overlayLine);
+    g2.draw(new Line2D.Double(x, yOffset, x, getHeight() - bottomHeight - 1));
 
-    markPath.reset();
-    markPath.moveTo((float) x, yOffset);
-    markPath.lineTo((float) x - 5, yOffset - 7);
-    markPath.lineTo((float) x + 5, yOffset - 7);
-    markPath.closePath();
+    GeneralPath gp = new GeneralPath();
+    gp.moveTo((float) x, yOffset);
+    gp.lineTo((float) x - 5, yOffset - 7);
+    gp.lineTo((float) x + 5, yOffset - 7);
+    gp.closePath();
     g2.setPaint(Color.GREEN);
-    g2.fill(markPath);
+    g2.fill(gp);
     g2.setColor(DARK_GREEN);
-    g2.draw(markPath);
+    g2.draw(gp);
   }
 
   /**
@@ -1001,28 +990,25 @@ public class WaveViewPanel extends JComponent {
     double x = (j2k - t[1]) / t[0];
     // draw line
     g2.setColor(PickWavePanel.DARK_GREEN);
-    overlayLine.setLine(x, yOffset, x, getHeight() - bottomHeight - 1);
-    g2.draw(overlayLine);
+    g2.draw(new Line2D.Double(x, yOffset, x, getHeight() - bottomHeight - 1));
 
     // get color
     String tag = pick.getTag();
     Color color = Color.GRAY;
-    Color uncertaintyShade = UNCERTAINTY_GRAY;
     if (tag.indexOf('P') != -1) {
       color = PickWavePanel.P_BACKGROUND;
-      uncertaintyShade = UNCERTAINTY_P;
     } else if (tag.indexOf('S') != -1) {
       color = PickWavePanel.S_BACKGROUND;
-      uncertaintyShade = UNCERTAINTY_S;
     } else if (tag.indexOf('C') != -1) {
       color = Color.YELLOW;
-      uncertaintyShade = UNCERTAINTY_CODA;
     }
     g2.setColor(color);
 
     // draw uncertainty
     double uncertainty = pick.getTimeQuantity().getUncertainty();
     if (!Double.isNaN(uncertainty)) {
+      Color uncertaintyShade =
+          new Color(color.getRed(), color.getGreen(), color.getBlue(), color.getAlpha() / 2);
       g2.setColor(uncertaintyShade);
       // lowerUncertainty
       long lowTime = (long) (pick.getTime() - 1000.0 * uncertainty);
@@ -1076,8 +1062,7 @@ public class WaveViewPanel extends JComponent {
 
     // draw line
     g2.setColor(PickWavePanel.DARK_GREEN);
-    overlayLine.setLine(x, yOffset, x, getHeight() - bottomHeight - 1);
-    g2.draw(overlayLine);
+    g2.draw(new Line2D.Double(x, yOffset, x, getHeight() - bottomHeight - 1));
 
     // get color
     Color color = Color.GRAY;
@@ -1155,14 +1140,15 @@ public class WaveViewPanel extends JComponent {
     }
     Dimension dim = this.getSize();
 
-    if (plot == null) {
-      plot = new Plot();
-    } else {
-      plot.clear();
-    }
+    Plot plot = new Plot();
     plot.setBackgroundColor(backgroundColor);
     plot.setSize(dim);
-    Wave renderWave = waveForRender();
+    Wave renderWave = wave;
+
+    if (settings.filterOn) {
+      renderWave = new Wave(wave);
+      renderWave.filter(settings.filter, settings.zeroPhaseShift);
+    }
     switch (settings.viewType) {
       case WAVE:
         plotWave(plot, renderWave);
@@ -1186,39 +1172,6 @@ public class WaveViewPanel extends JComponent {
       e.printStackTrace();
     }
 
-  }
-
-  /**
-   * Filtered copy of the current wave. Reused while the samples and filter settings are unchanged.
-   */
-  private Wave waveForRender() {
-    if (!settings.filterOn || wave == null) {
-      filteredWave = null;
-      filteredSource = null;
-      filteredBuffer = null;
-      return wave;
-    }
-    if (filteredWave == null || filteredSource != wave || filteredBuffer != wave.buffer
-        || filteredZeroPhase != settings.zeroPhaseShift
-        || filteredOrder != settings.filter.getOrder() || filteredType != settings.filter.getType()
-        || Double.doubleToLongBits(filteredCorner1) != Double
-            .doubleToLongBits(settings.filter.getCorner1())
-        || Double.doubleToLongBits(filteredCorner2) != Double
-            .doubleToLongBits(settings.filter.getCorner2())
-        || Double.doubleToLongBits(filteredRate) != Double
-            .doubleToLongBits(wave.getSamplingRate())) {
-      filteredWave = new Wave(wave);
-      filteredWave.filter(settings.filter, settings.zeroPhaseShift);
-      filteredSource = wave;
-      filteredBuffer = wave.buffer;
-      filteredZeroPhase = settings.zeroPhaseShift;
-      filteredOrder = settings.filter.getOrder();
-      filteredType = settings.filter.getType();
-      filteredCorner1 = settings.filter.getCorner1();
-      filteredCorner2 = settings.filter.getCorner2();
-      filteredRate = wave.getSamplingRate();
-    }
-    return filteredWave;
   }
 
   /**
@@ -1390,7 +1343,8 @@ public class WaveViewPanel extends JComponent {
     spectrogramRenderer.setMaxPower(settings.spectrogramMaxPower);
     spectrogramRenderer.setMinPower(settings.spectrogramMinPower);
 
-    spectrogramRenderer.setBinSize(ceilPowerOfTwo(settings.binSize * wave.getSamplingRate()));
+    spectrogramRenderer.setBinSize((int) Math.pow(2,
+        Math.ceil(Math.log(settings.binSize * wave.getSamplingRate()) / Math.log(2))));
 
     if (channel != null && displayTitle) {
       spectrogramRenderer.setTitle(channel);
@@ -1518,19 +1472,6 @@ public class WaveViewPanel extends JComponent {
   }
 
   /**
-   * Smallest power of two greater than or equal to the sample count.
-   */
-  private static int ceilPowerOfTwo(double samples) {
-    // highestOneBit matches pow(2, ceil(log2)) only through 2^28.
-    if (!(samples >= 1.0) || samples > (1 << 28)) {
-      return (int) Math.pow(2.0, Math.ceil(Math.log(samples) / Math.log(2.0)));
-    }
-    int rounded = (int) Math.ceil(samples);
-    int bin = Integer.highestOneBit(rounded);
-    return bin < rounded ? bin << 1 : bin;
-  }
-
-  /**
    * Paints the zoom drag box.
    * 
    * @param g2 the graphics context
@@ -1540,15 +1481,12 @@ public class WaveViewPanel extends JComponent {
     int x2 = Math.max(highlightX1, highlightX2);
     int width = x2 - x1 + 1;
     Paint pnt = g2.getPaint();
-    g2.setPaint(DRAG_HIGHLIGHT);
+    g2.setPaint(new Color(255, 255, 0, 128));
     g2.fillRect(x1, yOffset + 1, width, getSize().height - bottomHeight - yOffset);
     g2.setPaint(pnt);
   }
 
   public void setCursorMark(double j2k) {
-    if (Double.compare(cursorMark, j2k) == 0) {
-      return;
-    }
     cursorMark = j2k;
     repaint();
   }
@@ -1564,8 +1502,7 @@ public class WaveViewPanel extends JComponent {
     }
     double x = (cursorMark - t[1]) / t[0];
     g2.setColor(DARK_RED);
-    overlayLine.setLine(x, yOffset + 1, x, getHeight() - bottomHeight - 1);
-    g2.draw(overlayLine);
+    g2.draw(new Line2D.Double(x, yOffset + 1, x, getHeight() - bottomHeight - 1));
   }
 
 

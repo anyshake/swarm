@@ -337,13 +337,9 @@ public class WaveClipboardFrame extends SwarmFrame {
 
       final BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_4BYTE_ABGR);
       final Graphics g = image.getGraphics();
-      try {
-        for (final WaveViewPanel panel : waves) {
-          panel.paint(g);
-          g.translate(0, panel.getHeight());
-        }
-      } finally {
-        g.dispose();
+      for (final WaveViewPanel panel : waves) {
+        panel.paint(g);
+        g.translate(0, panel.getHeight());
       }
       try {
         final PngEncoderB png = new PngEncoderB(image, false, PngEncoder.FILTER_NONE, 7);
@@ -974,7 +970,7 @@ public class WaveClipboardFrame extends SwarmFrame {
     }
     select(p);
   }
-  
+
   /**
    * Sort wave panels in clipboard by picks.
    */
@@ -1032,12 +1028,12 @@ public class WaveClipboardFrame extends SwarmFrame {
         double mid = (wave.getEndTime()-wave.getStartTime())/2;
         double ptime = J2kSec.fromEpoch(pick.getTime());
         wave.setStartTime(ptime-mid);
-        wave.setEndTime(ptime+mid); 
+        wave.setEndTime(ptime+mid);
         wave.createImage();
       }
     }
   }
-  
+
   /**
    * Get selected wave panel.
    * 

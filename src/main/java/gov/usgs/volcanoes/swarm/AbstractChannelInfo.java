@@ -8,6 +8,29 @@ import java.util.List;
  * @author Kevin Frechette (ISTI)
  */
 public abstract class AbstractChannelInfo {
+  /**
+   * Compares this object with the specified object for order. Returns a negative
+   * integer, zero, or a positive integer as this object is less than, equal to,
+   * or greater than the specified object.
+   * 
+   * @param o the other channel information.
+   * @return a negative integer, zero, or a positive integer as this object is
+   *         less than, equal to, or greater than the specified object.
+   */
+  public int compareTo(AbstractChannelInfo o) {
+    return getFormattedScnl().compareTo(o.getFormattedScnl());
+  }
+
+  /**
+   * Determines if this channel information is the same as another.
+   * 
+   * @return true if this channel information is the same as another, false
+   *         otherwise.
+   */
+  public boolean equals(Object obj) {
+    return obj instanceof AbstractChannelInfo
+        && getFormattedScnl().equals(((AbstractChannelInfo) obj).getFormattedScnl());
+  }
 
   /**
    * Get the channel name.
@@ -17,11 +40,27 @@ public abstract class AbstractChannelInfo {
   public abstract String getChannel();
 
   /**
+   * Get the formatted SCNL.
+   * 
+   * @return the formatted SCNL.
+   */
+  public String getFormattedScnl() {
+    return ChannelUtil.getFormattedScnl(getStation(), getChannel(), getNetwork(), getLocation());
+  }
+
+  /**
    * Get the groups.
    * 
    * @return the list of groups.
    */
   public abstract List<String> getGroups();
+
+  /**
+   * Get the elevation.
+   * 
+   * @return the elevation.
+   */
+  public abstract double getHeight();
 
   /**
    * Get the latitude.
@@ -45,13 +84,6 @@ public abstract class AbstractChannelInfo {
   public abstract double getLongitude();
 
   /**
-   * Get the elevation.
-   * 
-   * @return the elevation.
-   */
-  public abstract double getHeight();
-
-  /**
    * Get the network name.
    * 
    * @return the network name.
@@ -71,25 +103,6 @@ public abstract class AbstractChannelInfo {
    * @return the station name.
    */
   public abstract String getStation();
-
-  /**
-   * Determines if this channel information is the same as another.
-   * 
-   * @return true if this channel information is the same as another, false otherwise.
-   */
-  public boolean equals(Object obj) {
-    return obj instanceof AbstractChannelInfo
-        && getFormattedScnl().equals(((AbstractChannelInfo) obj).getFormattedScnl());
-  }
-
-  /**
-   * Get the formatted SCNL.
-   * 
-   * @return the formatted SCNL.
-   */
-  public String getFormattedScnl() {
-    return ChannelUtil.getFormattedScnl(getStation(), getChannel(), getNetwork(), getLocation());
-  }
 
   /**
    * Get the hash code.

@@ -1,11 +1,6 @@
 package gov.usgs.volcanoes.swarm.data.fdsnws;
 
-import gov.usgs.volcanoes.swarm.ChannelGroupInfo;
-import gov.usgs.volcanoes.swarm.ChannelInfo;
-import gov.usgs.volcanoes.swarm.GroupsType;
-import gov.usgs.volcanoes.swarm.StationInfo;
 import java.io.BufferedReader;
-import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
@@ -13,192 +8,136 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 
-public abstract class AbstractWebServiceStationClient {
-  /** The station service output level. */
-  public enum OutputLevel {
-    NETWORK("network"), STATION("station"), CHANNEL("channel"), RESPONSE("response");
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-    private final String level;
+import gov.usgs.volcanoes.swarm.ChannelGroupInfo;
+import gov.usgs.volcanoes.swarm.ChannelInfo;
+import gov.usgs.volcanoes.swarm.GroupsType;
+import gov.usgs.volcanoes.swarm.StationInfo;
 
-    OutputLevel(String s) {
-      this.level = s;
-    }
+public abstract class AbstractWebServiceStationClient implements ChannelProcessor, WebServiceStationClient {
+  private static final Logger LOGGER = LoggerFactory.getLogger(AbstractWebServiceStationClient.class);
 
-    public String toString() {
-      return level;
-    }
-  }
-
-  /** Default web services URL for station. */
-  // public static final String DEFAULT_WS_URL = "http://www.iris.edu/ws/station/query";
-  public static final String DEFAULT_WS_URL = "http://service.iris.edu/fdsnws/station/1/query";
-
-  private static final String separatorText = "&";
-  private static final String equalsText = "=";
-  private static final String startTimeText = "starttime";
-
-  /**
-   * Create an empty channel list.
-   * 
-   * @return the channel list.
-   */
-  public static List<String> createChannelList() {
-    return createList();
-  }
-
-  /**
-   * Create an empty list.
-   * 
-   * @return the list.
-   */
-  public static <T> List<T> createList() {
-    return new ArrayList<T>();
-  }
-
-  /**
-   * Create an empty station list.
-   * 
-   * @return the station list.
-   */
-  public static List<StationInfo> createStationList() {
-    return createList();
-  }
-
-  /**
-   * Get the argument at the specified index.
-   * 
-   * @param args the arguments.
-   * @param index the index.
-   * @return the argument or null if none.
-   */
-  protected static String getArg(String[] args, int index) {
-    return getArg(args, index, null);
-  }
-
-  /**
-   * Get the argument at the specified index.
-   * 
-   * @param args the arguments.
-   * @param index the index.
-   * @param def the default value.
-   * @return the argument or the default value if none.
-   */
-  protected static String getArg(String[] args, int index, String def) {
-    if (args.length > index) {
-      return args[index];
-    }
-    return def;
-  }
-
-  /** The reader. */
-  private BufferedReader reader;
-
-  /** The HTTP URL Connection. */
-  protected HttpURLConnection conn;
-  /** The error message. */
-  protected final StringBuilder error = new StringBuilder();
   /** The base URL text. */
   private final String baseUrlText;
-  /** The network name. */
-  private final String net;
-  /** The station name. */
-  private final String sta;
-  /** The location name. */
-  public final String loc;
   /** The channel name. */
   private final String chan;
-  /** The date. */
-  private final Date date;
-  /** Groups type. */
-  protected final GroupsType groupsType;
-
+  /** The channel list. */
+  private final List<String> channelList = WebServiceStationClient.createList();
+  /** Channel processor list or empty list if none, not null */
+  private List<ChannelProcessor> channelProcessorList = Collections.emptyList();
+  /** The end date. */
+  private final Date endDate;
+  /** The error message. */
+  private final StringBuilder error = new StringBuilder();
   /** The output level. */
   private OutputLevel level = OutputLevel.CHANNEL;
-
-  /** The current station. */
-  private StationInfo currentStation;
-
-  /** The station list. */
-  private List<StationInfo> stationList;
-
-  /** The channel list. */
-  private List<String> channelList;
-
+  /** The location name. */
+  private final String loc;
+  /** The network name. */
+  private final String net;
   /** The network list. */
-  private List<String> networkList;
+  private final List<String> networkList = WebServiceStationClient.createList();
+  /** The station name. */
+  private final String sta;
+  /** The start date. */
+  private final Date startDate;
+  /** The station list. */
+  private final List<StationInfo> stationList = WebServiceStationClient.createList();
 
   /**
    * Create the web service station client.
    * 
    * @param baseUrlText the base URL text.
-   * @param net the network or null if none.
-   * @param sta the station or null if none.
-   * @param loc the location or null if none.
-   * @param chan the channel or null if none.
-   * @param date the date or null if none.
+   * @param net         the network or null if none.
+   * @param sta         the station or null if none.
+   * @param loc         the location or null if none.
+   * @param chan        the channel or null if none.
+   * @param startDate   the start date or null if none.
+   * @param endDate     the end date or null if none.
    */
-  public AbstractWebServiceStationClient(String baseUrlText, String net, String sta, String loc,
-      String chan, Date date) {
+  public AbstractWebServiceStationClient(String baseUrlText, String net, String sta, String loc, String chan,
+      Date startDate, Date endDate) {
     this.baseUrlText = baseUrlText;
     this.net = net;
     this.sta = sta;
     this.loc = loc;
     this.chan = chan;
-    this.date = date;
-    // if network contains wild card
-    /*
-     * if (net == null || net.length() == 0 || net.matches(".*[\\*?].*")) { if (useOnlyChannels())
-     * groupsType = GroupsType.NETWORK; else groupsType = GroupsType.NETWORK_AND_SITE; } else {
-     * groupsType = GroupsType.SITE; }
-     */
-    groupsType = GroupsType.NETWORK;
+    this.startDate = startDate;
+    this.endDate = endDate;
+  }
+
+  @Override
+  public void addChannelProcessor(ChannelProcessor cp) {
+    switch (channelProcessorList.size()) {
+    case 0:
+      channelProcessorList = Collections.singletonList(cp);
+      break;
+    case 1:
+      ChannelProcessor old = channelProcessorList.get(0);
+      channelProcessorList = new ArrayList<>();
+      channelProcessorList.add(old);
+      channelProcessorList.add(cp);
+      break;
+    default:
+      channelProcessorList.add(cp);
+      break;
+    }
   }
 
   /**
-   * Constructor.
+   * Append an error.
    * 
-   * @param baseUrlText base URL
+   * @param o the object to append.
    */
-  public AbstractWebServiceStationClient(String baseUrlText) {
-    this.baseUrlText = baseUrlText;
-    this.net = null;
-    this.sta = null;
-    this.loc = null;
-    this.chan = null;
-    this.date = null;
-    groupsType = GroupsType.NETWORK;
+  protected void appendError(Object o) {
+    error.append(o);
   }
 
   /**
-   * Append the name and value to the text.
+   * Append invalid line error with the default text.
    * 
-   * @param s the text.
-   * @param name the name.
-   * @param value the value or null if none.
-   * @return the text.
+   * @param line the line.
+   * @see #appendInvalidLine(String, String)
    */
-  protected String append(String s, String name, Object value) {
-    if (value instanceof Date) {
-      value = WebServiceUtils.getDateText((Date) value);
+  protected void appendInvalidLine(String line) {
+    appendInvalidLine(line, (String) null);
+  }
+
+  /**
+   * Append invalid line error.
+   * 
+   * @param line the line.
+   * @param s    the text to append before the line, null for the default (invalid
+   *             number of columns) or empty if none.
+   */
+  protected void appendInvalidLine(String line, String s) {
+    if (s == null) {
+      error.append("invalid number of columns ");
+    } else if (!s.isEmpty()) {
+      error.append(s);
+      // if does not end with space
+      if (!Character.isWhitespace(s.charAt(s.length() - 1))) {
+        error.append(' ');
+      }
     }
-    if (value == null || value.toString().length() == 0) {
-      return s;
-    }
-    if (s.length() > 0) {
-      s += separatorText;
-    }
-    s += name + equalsText + value.toString();
-    return s;
+    error.append("(");
+    error.append(line);
+    error.append(")\n");
   }
 
   /**
    * Clear the error message.
    */
   public void clearError() {
-    error.setLength(0);
+    if (error.length() != 0) {
+      error.setLength(0);
+    }
   }
 
   /**
@@ -214,49 +153,46 @@ public abstract class AbstractWebServiceStationClient {
   /**
    * Close the connection.
    */
-  public void close() {
-    if (reader != null) {
-      try {
-        reader.close();
-      } catch (Exception ex) {
-        //
-      }
-      reader = null;
-    }
-    if (conn != null) {
-      conn.disconnect();
-      conn = null;
+  protected void closeConnection(URLConnection conn) {
+    if (conn instanceof HttpURLConnection) {
+      ((HttpURLConnection) conn).disconnect();
     }
   }
 
   /**
    * Create the channel information.
    * 
-   * @param station the station.
-   * @param channel the channel.
-   * @param network the network.
-   * @param location the location.
-   * @param latitude the latitude.
-   * @param longitude the longitude.
-   * @param elevation the elevation
-   * @param siteName the site name.
-   * @param groupsType groups type.
+   * @param stationInfo station information.
+   * @param channel     channel name
+   * @param location    location
    * @return the channel information.
    */
-  protected ChannelInfo createChannelInfo(String station, String channel, String network,
-      String location, double latitude, double longitude, double elevation, String siteName,
-      GroupsType groupsType) {
-    if (currentStation == null) {
-      if (clearLatLon()) {
-        latitude = Double.NaN;
-        longitude = Double.NaN;
-        elevation = Double.NaN;
-      }
-      return new ChannelGroupInfo(station, channel, network, location, latitude, longitude,
-          elevation, siteName, groupsType);
-    } else {
-      return new ChannelGroupInfo(currentStation, channel, location, groupsType);
+  protected ChannelInfo createChannelInfo(StationInfo stationInfo, String channel, String location) {
+    return new ChannelGroupInfo(stationInfo, channel, location, getGroupsType());
+  }
+
+  /**
+   * Create the channel information.
+   * 
+   * @param station   the station.
+   * @param channel   the channel.
+   * @param network   the network.
+   * @param location  the location.
+   * @param latitude  the latitude.
+   * @param longitude the longitude.
+   * @param elevation the elevation
+   * @param siteName  the site name.
+   * @return the channel information.
+   */
+  protected ChannelInfo createChannelInfo(String station, String channel, String network, String location,
+      double latitude, double longitude, double elevation, String siteName) {
+    if (clearLatLon()) {
+      latitude = Double.NaN;
+      longitude = Double.NaN;
+      elevation = Double.NaN;
     }
+    return new ChannelGroupInfo(station, channel, network, location, latitude, longitude, elevation, siteName,
+        getGroupsType());
   }
 
   /**
@@ -264,14 +200,25 @@ public abstract class AbstractWebServiceStationClient {
    * 
    * @param station the station.
    * @param network the network.
-   * @param latitude the latitude.
-   * @param longitude the longitude.
-   * @param elevation the elevation
-   * @param siteName the site name.
    * @return the station information.
    */
-  protected StationInfo createStationInfo(String station, String network, double latitude,
-      double longitude, double elevation, String siteName) {
+  protected StationInfo createStationInfo(String station, String network) {
+    return new StationInfo(station, network, Double.NaN, Double.NaN, Double.NaN, null);
+  }
+
+  /**
+   * Create the station information.
+   * 
+   * @param station   the station.
+   * @param network   the network.
+   * @param latitude  the latitude.
+   * @param longitude the longitude.
+   * @param elevation the elevation
+   * @param siteName  the site name.
+   * @return the station information.
+   */
+  protected StationInfo createStationInfo(String station, String network, double latitude, double longitude,
+      double elevation, String siteName) {
     if (clearLatLon()) {
       latitude = Double.NaN;
       longitude = Double.NaN;
@@ -280,91 +227,39 @@ public abstract class AbstractWebServiceStationClient {
     return new StationInfo(station, network, latitude, longitude, elevation, siteName);
   }
 
-  /**
-   * Fetch the stations.
-   * 
-   * @throws Exception if an error occurs.
-   */
-  protected void fetch() throws Exception {
-    final URL url = getUrl();
-    final URLConnection urlConn = url.openConnection();
-    if (urlConn instanceof HttpURLConnection) {
-      conn = (HttpURLConnection) urlConn;
-      if (conn.getResponseCode() != 200) { // if response not OK
-        /*
-         * final BufferedReader errorReader = new BufferedReader(new
-         * InputStreamReader(conn.getErrorStream())); error.append("Error in connection with url: "
-         * + url + "\n"); for (String line; (line = readLine(errorReader)) != null;) {
-         * error.append(line + "\n");
-         */
-        error.append("Error in connection with url: " + url);
-        InputStream in = conn.getErrorStream();
-        if (in != null) {
-          final BufferedReader errorReader = new BufferedReader(new InputStreamReader(in));
-          for (String line; (line = readLine(errorReader)) != null;) {
-            error.append("\n" + line);
-          }
-          errorReader.close();
-
-        }
-        // errorReader.close();
-        return;
-      } else {
-        fetch(url);
+  @Override
+  public String fetch() {
+    clearError();
+    final URLConnection conn = openConnection();
+    if (conn != null) {
+      LOGGER.debug("web service {} {}", getLevel(), conn.getURL());
+      try {
+        fetch(conn);
+      } catch (Exception ex) {
+        error.append(ex);
+      }
+      closeConnection(conn);
+    }
+    String s = getError();
+    clearError();
+    if (s.isEmpty()) {
+      s = null;
+      // if fetching networks and network list is empty
+      if (getLevel() == OutputLevel.NETWORK && getNetworkList().isEmpty()) {
+        s = "no networks";
       }
     }
+    return s;
   }
 
   /**
    * Fetch the stations.
    * 
-   * @param url the URL.
+   * @param conn the connection.
    * 
    * @throws Exception if an error occurs.
    */
-  protected abstract void fetch(URL url) throws Exception;
-
-  /**
-   * Fetch the channels and optionally put them in the channel list if it is set.
-   * 
-   * @return an error message or null if none.
-   * @see #getChannelList()
-   * @see #setChannelList(List)
-   */
-  public String fetchChannels() {
-    clearError();
-    try {
-      setLevel(OutputLevel.CHANNEL);
-      fetch();
-    } catch (Exception ex) {
-      ex.printStackTrace();
-    }
-    close();
-    String error = getError();
-    clearError();
-    return error.length() == 0 ? null : error;
-  }
-
-  /**
-   * Fetch the stations and optionally put them in the stations list if it is set.
-   * 
-   * @return an error message or null if none.
-   * @see #getStationList()
-   * @see #setStationList()
-   */
-  public String fetchStations() {
-    clearError();
-    try {
-      setLevel(OutputLevel.STATION);
-      fetch();
-    } catch (Exception ex) {
-      ex.printStackTrace();
-    }
-    close();
-    String error = getError();
-    clearError();
-    return error.length() == 0 ? null : error;
-  }
+  protected abstract void fetch(URLConnection conn) throws Exception;
 
   /**
    * Get the base URL text.
@@ -372,35 +267,22 @@ public abstract class AbstractWebServiceStationClient {
    * @return the base URL text.
    */
   protected String getBaseUrlText() {
-    return baseUrlText + "?";
+    return baseUrlText;
   }
 
-  /**
-   * Get the channel list.
-   * 
-   * @return the channel list or null if none.
-   * @see #fetchChannels()
-   */
+  @Override
+  public String getChannel() {
+    return chan;
+  }
+
+  @Override
   public List<String> getChannelList() {
     return channelList;
   }
 
-  /**
-   * Get the network list.
-   *
-   * @return the network list or null if none.
-   */
-  public List<String> getNetworkList() {
-    return networkList;
-  }
-
-  /**
-   * Get the current station.
-   * 
-   * @return the current station or null if none.
-   */
-  public StationInfo getCurrentStation() {
-    return currentStation;
+  @Override
+  public Date getEndDate() {
+    return endDate;
   }
 
   /**
@@ -413,35 +295,45 @@ public abstract class AbstractWebServiceStationClient {
   }
 
   /**
-   * Get the output level.
+   * Get the groups type.
    * 
-   * @return the output level.
+   * @return the groups type.
    */
+  protected GroupsType getGroupsType() {
+    return GroupsType.NETWORK;
+  }
+
+  @Override
   public OutputLevel getLevel() {
     return level;
   }
 
-  /**
-   * Get the reader.
-   * 
-   * @return the reader.
-   * @throws IOException if an I/O Exception occurs.
-   */
-  public BufferedReader getReader() throws IOException {
-    BufferedReader reader = this.reader;
-    if (reader == null) {
-      reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-      this.reader = reader;
-    }
-    return reader;
+  @Override
+  public String getLocation() {
+    return loc;
   }
 
-  /**
-   * Get the station list.
-   * 
-   * @return the station list or null if none.
-   * @see #fetchStations()
-   */
+  @Override
+  public String getNetwork() {
+    return net;
+  }
+
+  @Override
+  public List<String> getNetworkList() {
+    return networkList;
+  }
+
+  @Override
+  public Date getStartDate() {
+    return startDate;
+  }
+
+  @Override
+  public String getStation() {
+    return sta;
+  }
+
+  @Override
   public List<StationInfo> getStationList() {
     return stationList;
   }
@@ -453,7 +345,9 @@ public abstract class AbstractWebServiceStationClient {
    * @throws MalformedURLException if the URL text is invalid.
    */
   protected URL getUrl() throws MalformedURLException {
-    return new URL(getUrlTextWithTime());
+    String s = getUrlText();
+    LOGGER.trace(s);
+    return new URL(s);
   }
 
   /**
@@ -462,47 +356,45 @@ public abstract class AbstractWebServiceStationClient {
    * @return the URL text.
    */
   protected String getUrlText() {
-    String urlText = getBaseUrlText();
-    urlText = append(urlText, "level", level);
-    if (currentStation == null) {
-      // urlText = append(urlText, "net", net);
-      // urlText = append(urlText, "sta", sta);
-      urlText = append(urlText, "network", net);
-      urlText = append(urlText, "station", sta);
-    } else {
-      // urlText = append(urlText, "net", currentStation.getNetwork());
-      // urlText = append(urlText, "sta", currentStation.getStation());
-      urlText = append(urlText, "network", currentStation.getNetwork());
-      urlText = append(urlText, "station", currentStation.getStation());
-    }
-    // urlText = append(urlText, "loc", loc);
-    // urlText = append(urlText, "chan", chan);
-    urlText = append(urlText, "location", loc);
-    urlText = append(urlText, "channel", chan);
-    urlText = append(urlText, startTimeText, date);
-    return urlText;
+    return getBaseUrlText();
   }
 
   /**
-   * Get the URL text with time.
+   * Open a connection.
    * 
-   * @return the URL text with time.
+   * @return the connection or null if error.
    */
-  protected String getUrlTextWithTime() {
-    String urlText = getUrlText();
-    if (!urlText.contains(startTimeText)) {
-      urlText = append(urlText, startTimeText, new Date());
+  protected URLConnection openConnection() {
+    try {
+      final URL url = getUrl();
+      final URLConnection conn = url.openConnection();
+      if (conn instanceof HttpURLConnection) {
+        HttpURLConnection httpconn = (HttpURLConnection) conn;
+        final int code = httpconn.getResponseCode();
+        if (code != 200) { // if response not OK
+          error.append("Error in connection with url: ");
+          error.append(url);
+          InputStream in = httpconn.getErrorStream();
+          if (in != null) {
+            try (final BufferedReader errorReader = new BufferedReader(new InputStreamReader(in))) {
+              for (String line; (line = readLine(errorReader)) != null;) {
+                error.append("\n" + line);
+              }
+            }
+          } else {
+            error.append(" (");
+            error.append(code);
+            error.append(")");
+          }
+          httpconn.disconnect();
+          return null;
+        }
+      }
+      return conn;
+    } catch (Exception ex) {
+      error.append(ex);
     }
-    return urlText;
-  }
-
-  /**
-   * Determine if all networks.
-   * 
-   * @return true if all networks, false otherwise.
-   */
-  protected boolean isAllNetworks() {
-    return net == null || net.length() == 0 || net.equals("*");
+    return null;
   }
 
   /**
@@ -511,11 +403,22 @@ public abstract class AbstractWebServiceStationClient {
    * @param ch the channel information.
    */
   public void processChannel(ChannelInfo ch) {
-    if (channelList == null) {
-      System.out.println(ch);
-    } else {
+    if (channelProcessorList.isEmpty()) {
       channelList.add(ch.toString());
+    } else {
+      for (ChannelProcessor channelProcessor : channelProcessorList) {
+        channelProcessor.processChannel(ch);
+      }
     }
+  }
+
+  /**
+   * Process the network.
+   * 
+   * @param network the network.
+   */
+  public void processNetwork(String network) {
+    networkList.add(network);
   }
 
   /**
@@ -524,11 +427,7 @@ public abstract class AbstractWebServiceStationClient {
    * @param si the station information.
    */
   public void processStation(StationInfo si) {
-    if (stationList == null) {
-      System.out.println(si);
-    } else {
-      stationList.add(si);
-    }
+    stationList.add(si);
   }
 
   /**
@@ -540,37 +439,10 @@ public abstract class AbstractWebServiceStationClient {
   protected String readLine(BufferedReader reader) {
     try {
       return reader.readLine();
-    } catch (IOException ex) {
+    } catch (Exception ex) {
       //
     }
     return null;
-  }
-
-  /**
-   * Set the channel list.
-   * 
-   * @param channelList the channel list.
-   */
-  public void setChannelList(List<String> channelList) {
-    this.channelList = channelList;
-  }
-
-  /**
-   * Set the network list.
-   *
-   * @param networkList the channel list.
-   */
-  public void setNetworkList(List<String> networkList) {
-    this.networkList = networkList;
-  }
-
-  /**
-   * Set the current station.
-   * 
-   * @param station the station or null if none.
-   */
-  public void setCurrentStation(StationInfo station) {
-    currentStation = station;
   }
 
   /**
@@ -579,24 +451,8 @@ public abstract class AbstractWebServiceStationClient {
    * @param level the output level.
    */
   public void setLevel(OutputLevel level) {
-    this.level = level;
-  }
-
-  /**
-   * Set the station list.
-   * 
-   * @param stationList the station list.
-   */
-  public void setStationList(List<StationInfo> stationList) {
-    this.stationList = stationList;
-  }
-
-  /**
-   * Determines if only channels should be fetched.
-   * 
-   * @return true if only channels should be fetched.
-   */
-  protected boolean useOnlyChannels() {
-    return isAllNetworks();
+    if (level != null) {
+      this.level = level;
+    }
   }
 }

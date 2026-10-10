@@ -57,15 +57,6 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
   private static final Color BLUE = new Color(0, 0, 200, 200);
   private static final Color PURPLE = new Color(200, 0, 200, 200);
   private static final Color BLACK = new Color(0, 0, 0, 200);
-  private static final Color POPUP_SHADE = new Color(0, 0, 0, 128);
-  private static final BasicStroke POPUP_STROKE = new BasicStroke(1.2f);
-  private static final BasicStroke LEGEND_STROKE = new BasicStroke(1.2f);
-  private static final BasicStroke LEGEND_STROKE_BOLD = new BasicStroke(2.0f);
-  private final Ellipse2D.Float markerShape = new Ellipse2D.Float();
-  private final Ellipse2D.Double legendCircle = new Ellipse2D.Double();
-  private final Point2D.Double eventLonLat = new Point2D.Double();
-  private final Point2D.Double eventPixel = new Point2D.Double();
-  private final Rectangle hitBox = new Rectangle();
 
   private final Map<String, Event> events;
   private final Map<String, Event> importedEvents;
@@ -125,34 +116,34 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
     int widthPx = panel.getGraphWidth();
     int heightPx = panel.getGraphHeight();
     int insetPx = panel.getInset();
-    final double[] ext = range.getProjectedExtents(projection);
-    final double dx = (ext[1] - ext[0]);
-    final double dy = (ext[3] - ext[2]);
 
     for (final Event event : events.values()) {
       Origin origin = event.getPreferredOrigin();
       if (origin == null) {
         continue;
       }
-      eventLonLat.setLocation(origin.getLongitude(), origin.getLatitude());
-      if (!range.contains(eventLonLat)) {
+      Point2D.Double originLoc = new Point2D.Double(origin.getLongitude(), origin.getLatitude());
+      if (!range.contains(originLoc)) {
         continue;
       }
 
-      final Point2D.Double xy = projection.forward(eventLonLat);
+      final Point2D.Double xy = projection.forward(originLoc);
 
-      eventPixel.x = (((xy.x - ext[0]) / dx) * widthPx + insetPx);
-      eventPixel.y = ((1 - (xy.y - ext[2]) / dy) * heightPx + insetPx);
+      final double[] ext = range.getProjectedExtents(projection);
+      final double dx = (ext[1] - ext[0]);
+      final double dy = (ext[3] - ext[2]);
+      final Point2D.Double res = new Point2D.Double();
+      res.x = (((xy.x - ext[0]) / dx) * widthPx + insetPx);
+      res.y = ((1 - (xy.y - ext[2]) / dy) * heightPx + insetPx);
 
-      g2.translate(eventPixel.x, eventPixel.y);
+      g2.translate(res.x, res.y);
 
       Magnitude magnitude = event.getPreferredMagnitude();
       float diameter = 5;
       if (magnitude != null) {
         diameter = getMarkerSize(magnitude.getMagnitude().getValue());
       }
-      markerShape.setFrame(0f, 0f, diameter, diameter);
-      renderer.shape = markerShape;
+      renderer.shape = new Ellipse2D.Float(0f, 0f, diameter, diameter);
 
 
       Color markerColor;
@@ -195,7 +186,7 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
       renderer.paint = markerColor;
       renderer.renderAtOrigin(g2);
 
-      g2.translate(-eventPixel.x, -eventPixel.y);
+      g2.translate(-res.x, -res.y);
     }
 
     drawPopup(g2);
@@ -237,25 +228,26 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
     int heightPx = panel.getGraphHeight();
     int insetPx = panel.getInset();
 
-    eventLonLat.setLocation(origin.getLongitude(), origin.getLatitude());
-    final Point2D.Double xy = projection.forward(eventLonLat);
+    final Point2D.Double xy =
+        projection.forward(new Point2D.Double(origin.getLongitude(), origin.getLatitude()));
     final double[] ext = range.getProjectedExtents(projection);
     final double dx = (ext[1] - ext[0]);
     final double dy = (ext[3] - ext[2]);
+    final Point2D.Double res = new Point2D.Double();
 
-    eventPixel.x = (((xy.x - ext[0]) / dx) * widthPx + insetPx);
+    res.x = (((xy.x - ext[0]) / dx) * widthPx + insetPx);
     int maxX = widthPx - popupWidth + POPUP_PADDING;
-    eventPixel.x = Math.min(eventPixel.x, maxX);
+    res.x = Math.min(res.x, maxX);
 
-    eventPixel.y = ((1 - (xy.y - ext[2]) / dy) * heightPx + insetPx);
-    if (eventPixel.y < (insetPx + popupHeight)) {
-      eventPixel.y += popupHeight;
+    res.y = ((1 - (xy.y - ext[2]) / dy) * heightPx + insetPx);
+    if (res.y < (insetPx + popupHeight)) {
+      res.y += popupHeight;
     }
 
-    g2.translate(eventPixel.x, eventPixel.y);
+    g2.translate(res.x, res.y);
 
-    g2.setStroke(POPUP_STROKE);
-    g2.setColor(POPUP_SHADE);
+    g2.setStroke(new BasicStroke(1.2f));
+    g2.setColor(new Color(0, 0, 0, 128));
     g2.drawRect(0, -(popupHeight - POPUP_PADDING), popupWidth, popupHeight);
     g2.fillRect(0, -(popupHeight - POPUP_PADDING), popupWidth, popupHeight);
 
@@ -266,7 +258,7 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
       Rectangle2D bounds = fm.getStringBounds(string, g2);
       baseY += (int) (Math.ceil(bounds.getHeight()) + 2);
     }
-    g2.translate(-eventPixel.x, -eventPixel.y);
+    g2.translate(-res.x, -res.y);
 
   }
 
@@ -363,9 +355,6 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
     int widthPx = panel.getGraphWidth();
     int heightPx = panel.getGraphHeight();
     int insetPx = panel.getInset();
-    final double[] ext = range.getProjectedExtents(projection);
-    final double dx = (ext[1] - ext[0]);
-    final double dy = (ext[3] - ext[2]);
 
     Iterator<Event> it = events.values().iterator();
     boolean handled = false;
@@ -377,8 +366,8 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
         continue;
       }
 
-      eventLonLat.setLocation(origin.getLongitude(), origin.getLatitude());
-      if (!range.contains(eventLonLat)) {
+      Point2D.Double originLoc = new Point2D.Double(origin.getLongitude(), origin.getLatitude());
+      if (!range.contains(originLoc)) {
         continue;
       }
 
@@ -387,13 +376,19 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
       if (magnitude != null) {
         markerDiameter = getMarkerSize(event.getPreferredMagnitude().getMagnitude().getValue());
       }
+      final Rectangle r = new Rectangle(0, 0, markerDiameter, markerDiameter);
 
-      final Point2D.Double xy = projection.forward(eventLonLat);
-      eventPixel.x = (((xy.x - ext[0]) / dx) * widthPx + insetPx);
-      eventPixel.y = ((1 - (xy.y - ext[2]) / dy) * heightPx + insetPx);
+      final Point2D.Double xy =
+          projection.forward(new Point2D.Double(origin.getLongitude(), origin.getLatitude()));
+      final double[] ext = range.getProjectedExtents(projection);
+      final double dx = (ext[1] - ext[0]);
+      final double dy = (ext[3] - ext[2]);
+      final Point2D.Double res = new Point2D.Double();
+      res.x = (((xy.x - ext[0]) / dx) * widthPx + insetPx);
+      res.y = ((1 - (xy.y - ext[2]) / dy) * heightPx + insetPx);
 
-      hitBox.setBounds((int) eventPixel.x, (int) eventPixel.y, markerDiameter, markerDiameter);
-      if (hitBox.contains(e.getPoint())) {
+      r.translate((int) res.x, (int) res.y);
+      if (r.contains(e.getPoint())) {
         LOGGER.debug("set hover event {}", event.publicId);
         hoverEvent = event;
         handled = true;
@@ -499,12 +494,12 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
     // legend background
     int recHeight = 90;
     int recWidth = 280;
-    g2.setStroke(LEGEND_STROKE);
+    g2.setStroke(new BasicStroke(1.2f));
     g2.setColor(WHITE);
     g2.drawRect(insetPx, insetPx + heightPx - recHeight, recWidth, recHeight);
     g2.fillRect(insetPx, insetPx + heightPx - recHeight, recWidth, recHeight);
 
-    g2.setStroke(LEGEND_STROKE_BOLD);
+    g2.setStroke(new BasicStroke(2.0f));
     g2.setColor(BLACK);
     // Depth label
     float x = insetPx + 5;
@@ -513,49 +508,49 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
     y += 15;
     int size = getMarkerSize(3);
     // < 0 km
-    legendCircle.setFrame(x, y - size / 2, size, size);
+    Ellipse2D.Double circle = new Ellipse2D.Double(x, y - size / 2, size, size);
     g2.setColor(RED);
-    g2.fill(legendCircle);
+    g2.fill(circle);
     x += size + 2;
     g2.setColor(BLACK);
     g2.drawString("< 0", x, y + size / 2);
     x += 25;
     // 0-5 km
-    legendCircle.setFrame(x, y - size / 2, size, size);
+    circle = new Ellipse2D.Double(x, y - size / 2, size, size);
     g2.setColor(ORANGE);
-    g2.fill(legendCircle);
+    g2.fill(circle);
     x += size + 2;
     g2.setColor(BLACK);
     g2.drawString("0-5", x, y + size / 2);
     x += 30;
     // 5-13 km
-    legendCircle.setFrame(x, y - size / 2, size, size);
+    circle = new Ellipse2D.Double(x, y - size / 2, size, size);
     g2.setColor(YELLOW);
-    g2.fill(legendCircle);
+    g2.fill(circle);
     x += size + 2;
     g2.setColor(BLACK);
     g2.drawString("5-13", x, y + size / 2);
     x += 35;
     // 13-20 km
-    legendCircle.setFrame(x, y - size / 2, size, size);
+    circle = new Ellipse2D.Double(x, y - size / 2, size, size);
     g2.setColor(GREEN);
-    g2.fill(legendCircle);
+    g2.fill(circle);
     x += size + 2;
     g2.setColor(BLACK);
     g2.drawString("13-20", x, y + size / 2);
     x += 40;
     // 20-40 km
-    legendCircle.setFrame(x, y - size / 2, size, size);
+    circle = new Ellipse2D.Double(x, y - size / 2, size, size);
     g2.setColor(BLUE);
-    g2.fill(legendCircle);
+    g2.fill(circle);
     x += size + 2;
     g2.setColor(BLACK);
     g2.drawString("20-40", x, y + size / 2);
     x += 40;
     // 40+ km
-    legendCircle.setFrame(x, y - size / 2, size, size);
+    circle = new Ellipse2D.Double(x, y - size / 2, size, size);
     g2.setColor(PURPLE);
-    g2.fill(legendCircle);
+    g2.fill(circle);
     x += size + 2;
     g2.setColor(BLACK);
     g2.drawString("40+", x, y + size / 2);
@@ -571,9 +566,9 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
       g2.setColor(BLACK);
       g2.drawString(Integer.toString(i), x, y + 5);
       x += 10;
-      legendCircle.setFrame(x, y - size / 2, size, size);
+      circle = new Ellipse2D.Double(x, y - size / 2, size, size);
       g2.setColor(ORANGE);
-      g2.fill(legendCircle);
+      g2.fill(circle);
       x += size + 10;
     }
   }
@@ -591,33 +586,33 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
     // legend background
     int recHeight = 50;
     int recWidth = 330;
-    g2.setStroke(LEGEND_STROKE);
+    g2.setStroke(new BasicStroke(1.2f));
     g2.setColor(WHITE);
     g2.drawRect(insetPx, insetPx + heightPx - recHeight, recWidth, recHeight);
     g2.fillRect(insetPx, insetPx + heightPx - recHeight, recWidth, recHeight);
 
     int size = getMarkerSize(3);
-    g2.setStroke(LEGEND_STROKE_BOLD);
+    g2.setStroke(new BasicStroke(2.0f));
     // 1 hour ago key
     float x = insetPx + 5;
     float y = insetPx + (heightPx - recHeight) + 2;
-    legendCircle.setFrame(x, y, size, size);
+    Ellipse2D.Double circle = new Ellipse2D.Double(x, y, size, size);
     g2.setColor(RED);
-    g2.fill(legendCircle);
+    g2.fill(circle);
     g2.setColor(BLACK);
     g2.drawString("< 1 Hour", x + size + 1, y + size);
     // 1 day ago key
     y = y + size + 5;
-    legendCircle.setFrame(x, y, size, size);
+    circle = new Ellipse2D.Double(x, y, size, size);
     g2.setColor(ORANGE);
-    g2.fill(legendCircle);
+    g2.fill(circle);
     g2.setColor(BLACK);
     g2.drawString("< 1 Day", x + size + 1, y + size);
     // 1 week ago key
     y = y + size + 5;
-    legendCircle.setFrame(x, y, size, size);
+    circle = new Ellipse2D.Double(x, y, size, size);
     g2.setColor(YELLOW);
-    g2.fill(legendCircle);
+    g2.fill(circle);
     g2.setColor(BLACK);
     g2.drawString("< 1 Week", x + size + 1, y + size);
 
@@ -631,9 +626,9 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
       g2.setColor(BLACK);
       g2.drawString(Integer.toString(i), x, y + 5);
       x += 10;
-      legendCircle.setFrame(x, y - size / 2, size, size);
+      circle = new Ellipse2D.Double(x, y - size / 2, size, size);
       g2.setColor(ORANGE);
-      g2.fill(legendCircle);
+      g2.fill(circle);
       x += size + 10;
     }
   }

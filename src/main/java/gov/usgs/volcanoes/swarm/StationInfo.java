@@ -5,7 +5,7 @@ package gov.usgs.volcanoes.swarm;
  * 
  * @author Kevin Frechette (ISTI)
  */
-public class StationInfo {
+public class StationInfo implements Comparable<StationInfo> {
   /**
    * Get the double value for the specified text.
    * 
@@ -23,11 +23,8 @@ public class StationInfo {
     return Double.NaN;
   }
 
-  /** The station name. */
-  private final String station;
-
-  /** The network name. */
-  private final String network;
+  /** The height. */
+  private final double elevation;
 
   /** The latitude. */
   private final double latitude;
@@ -35,35 +32,68 @@ public class StationInfo {
   /** The longitude. */
   private final double longitude;
 
-  /** The height. */
-  private final double elevation;
+  /** The network name. */
+  private final String network;
 
   /** The site name. */
   private final String siteName;
 
-  public StationInfo(String station, String network, double latitude, double longitude,
-      double elevation) {
-    this(station, network, latitude, longitude, elevation, (String) null);
-  }
+  /** The station name. */
+  private final String station;
+
+  /** the text */
+  private final String text;
 
   /**
    * Constructor.
    * 
-   * @param station station
-   * @param network network
-   * @param latitude latitude
-   * @param longitude longitude
-   * @param elevation elevation
-   * @param siteName name
+   * @param station   station
+   * @param network   network
+   * @param latitude  latitude or NaN if none
+   * @param longitude longitude or NaN if none
+   * @param elevation elevation or NaN if none
+   * @param siteName  name or null if same as station
    */
-  public StationInfo(String station, String network, double latitude, double longitude,
-      double elevation, String siteName) {
+  public StationInfo(String station, String network, double latitude, double longitude, double elevation,
+      String siteName) {
     this.station = station;
     this.network = network;
     this.latitude = latitude;
     this.longitude = longitude;
     this.elevation = elevation;
-    this.siteName = siteName != null ? siteName : station;
+    if (siteName != null && siteName.equals(station)) {
+      siteName = null;
+    }
+    this.siteName = siteName;
+    if (Double.isNaN(latitude) && Double.isNaN(longitude) && Double.isNaN(elevation) && siteName == null) {
+      text = station + " " + network;
+    } else {
+      text = station + " " + network + " " + latitude + " " + longitude + " " + elevation + " " + getSiteName();
+    }
+  }
+
+  @Override
+  public int compareTo(StationInfo o) {
+    return text.compareTo(o.text);
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    return obj instanceof StationInfo && text.equals(((StationInfo) obj).text);
+  }
+
+  /**
+   * Get elevation.
+   * 
+   * @return the elevation
+   */
+  public double getElevation() {
+    return elevation;
+  }
+
+  @Override
+  public int hashCode() {
+    return text.hashCode();
   }
 
   /**
@@ -96,10 +126,14 @@ public class StationInfo {
   /**
    * Get the site name.
    * 
-   * @return the site name.
+   * @return the site name or the station name if no site name.
    */
   public String getSiteName() {
-    return siteName;
+    String s = siteName;
+    if (s == null) {
+      s = station;
+    }
+    return s;
   }
 
   /**
@@ -117,16 +151,6 @@ public class StationInfo {
    * @return the string representation of the station information.
    */
   public String toString() {
-    return station + " " + network + " " + latitude + " " + longitude + " " + elevation + " "
-        + siteName;
-  }
-
-  /**
-   * Get elevation.
-   * 
-   * @return the elevation
-   */
-  public double getElevation() {
-    return elevation;
+    return text;
   }
 }

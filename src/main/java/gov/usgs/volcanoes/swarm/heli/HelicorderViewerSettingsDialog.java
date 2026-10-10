@@ -6,6 +6,7 @@ import gov.usgs.volcanoes.core.ui.GridBagHelper;
 import gov.usgs.volcanoes.swarm.Icons;
 import gov.usgs.volcanoes.swarm.Swarm;
 import gov.usgs.volcanoes.swarm.SwarmModalDialog;
+import gov.usgs.volcanoes.swarm.SwingWorker;
 import gov.usgs.volcanoes.swarm.internalframe.SwarmInternalFrames;
 import gov.usgs.volcanoes.swarm.wave.WaveViewSettings;
 import gov.usgs.volcanoes.swarm.wave.WaveViewSettingsDialog;
@@ -42,6 +43,10 @@ import javax.swing.border.TitledBorder;
  */
 public class HelicorderViewerSettingsDialog extends SwarmModalDialog {
   public static final long serialVersionUID = -1;
+  private static final int MIN_REFRESH_INTERVAL = 0;
+  private static final int MAX_REFRESH_INTERVAL = 3600;
+  private static final int MIN_SCROLL_SIZE = 0;
+  private static final int MAX_SCROLL_SIZE = 48;
 
   private HelicorderViewerSettings settings;
   private WaveViewSettings waveSettings;
@@ -121,8 +126,26 @@ public class HelicorderViewerSettingsDialog extends SwarmModalDialog {
     setToCurrent();
   }
 
+  private void createComponents() {
+    int[] values = HelicorderViewerFrame.chunkValues;
+    String[] chunks = new String[values.length];
+    for (int i = 0; i < chunks.length; i++) {
+      chunks[i] = Integer.toString(values[i] / 60);
+    }
+    chunkList = new JComboBox<String>(chunks);
+
+    values = HelicorderViewerFrame.spanValues;
+    String[] spans = new String[values.length];
+    for (int i = 0; i < spans.length; i++) {
+      spans[i] = Integer.toString(values[i] / 60);
+    }
+
+    spanList = new JComboBox<String>(spans);
+  }
+
   protected void createUi() {
     super.createUi();
+    createComponents();
 
     // AXIS PANEL
     int[] values = HelicorderViewerFrame.chunkValues;
@@ -229,10 +252,14 @@ public class HelicorderViewerSettingsDialog extends SwarmModalDialog {
     cvLabel.setLabelFor(clipValue);
 
     refreshInterval = new JTextField(4);
+    refreshInterval.setToolTipText(MIN_REFRESH_INTERVAL + "-" + MAX_REFRESH_INTERVAL + ", "
+        + MIN_REFRESH_INTERVAL + " for no refresh");
     JLabel refreshLabel = new JLabel("Refresh, seconds: ");
     refreshLabel.setLabelFor(refreshInterval);
     JLabel scrollLabel = new JLabel("Scroll size, rows: ");
     scrollSize = new JTextField(4);
+    scrollSize.setToolTipText(
+        MIN_SCROLL_SIZE + "-" + MAX_SCROLL_SIZE + ", " + MIN_SCROLL_SIZE + " for auto");
     scrollLabel.setLabelFor(scrollSize);
 
     autoScale = new JCheckBox("Auto-scale");
@@ -287,21 +314,44 @@ public class HelicorderViewerSettingsDialog extends SwarmModalDialog {
     mainPanel.add(dialogPanel, BorderLayout.CENTER);
   }
 
-  // These run on the event thread that delivered the click, not on a new thread per click.
   private void setShowClipEnabled(final boolean b) {
-    alertClip.setEnabled(b);
-    setAlertClipEnabled(b);
+    SwingWorker worker = new SwingWorker() {
+      public Object construct() {
+        alertClip.setEnabled(b);
+        setAlertClipEnabled(b);
+        return null;
+      }
+
+      public void finished() {}
+    };
+    worker.start();
   }
 
   private void setAlertClipEnabled(final boolean b) {
-    boolean state = showClip.isSelected() && alertClip.isSelected();
-    alertClipTimeout.setEnabled(state);
-    alertClipTimeoutLabel.setEnabled(state);
+    SwingWorker worker = new SwingWorker() {
+      public Object construct() {
+        boolean state = showClip.isSelected() && alertClip.isSelected();
+        alertClipTimeout.setEnabled(state);
+        alertClipTimeoutLabel.setEnabled(state);
+        return null;
+      }
+
+      public void finished() {}
+    };
+    worker.start();
   }
 
   private void setAutoScaleEnabled(final boolean b) {
-    clipValue.setEnabled(!b);
-    barRange.setEnabled(!b);
+    SwingWorker worker = new SwingWorker() {
+      public Object construct() {
+        clipValue.setEnabled(!b);
+        barRange.setEnabled(!b);
+        return null;
+      }
+
+      public void finished() {}
+    };
+    worker.start();
   }
 
   /**
@@ -425,15 +475,17 @@ public class HelicorderViewerSettingsDialog extends SwarmModalDialog {
       }
 
       // validate
-      message = "Invalid refresh interval; legal values are between 0 and 3600, 0 for no refresh.";
+      message = "Invalid refresh interval; legal values are between " + MIN_REFRESH_INTERVAL
+          + " and " + MAX_REFRESH_INTERVAL + ", 0 for no refresh.";
       int ri = Integer.parseInt(refreshInterval.getText());
-      if (ri < 0 || ri > 3600) {
+      if (ri < MIN_REFRESH_INTERVAL || ri > MAX_REFRESH_INTERVAL) {
         throw new NumberFormatException();
       }
 
-      message = "Invalid scroll size; legal values are between 1 and 48.";
+      message = "Invalid scroll size; legal values are between " + MIN_SCROLL_SIZE + " and "
+          + MAX_SCROLL_SIZE + ".";
       int ss = Integer.parseInt(scrollSize.getText());
-      if (ss < 1 || ss > 48) {
+      if (ss < MIN_SCROLL_SIZE || ss > MAX_SCROLL_SIZE) {
         throw new NumberFormatException();
       }
 

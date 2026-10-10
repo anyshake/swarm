@@ -35,8 +35,6 @@ public class PickWavePanel extends WaveViewPanel implements EventObserver {
 
   private final List<Arrival> arrivals;
   private final Stack<double[]> zoomHistory;
-  private final Line2D.Double arrivalLine = new Line2D.Double();
-  private final Rectangle2D.Double residualRect = new Rectangle2D.Double();
 
   /**
    * Default constructor.
@@ -89,16 +87,14 @@ public class PickWavePanel extends WaveViewPanel implements EventObserver {
 
       double x = 2 + (j2k - t[1]) / t[0];
       g2.setColor(DARK_GREEN);
-      arrivalLine.setLine(x, yOffset, x, getHeight() - bottomHeight - 1);
-      g2.draw(arrivalLine);
+      g2.draw(new Line2D.Double(x, yOffset, x, getHeight() - bottomHeight - 1));
 
       double residual = arrival.getTimeResidual();
       if (residual != 0) {
         double residualMark = 2 + (j2k + residual - t[1]) / t[0];
         g2.setColor(RESIDUAL_COLOR);
-        residualRect.setRect(Math.min(x, residualMark), yOffset, Math.abs(x - residualMark),
-            getHeight() - bottomHeight - 1);
-        g2.fill(residualRect);
+        g2.fill(new Rectangle2D.Double(Math.min(x, residualMark), yOffset,
+            Math.abs(x - residualMark), getHeight() - bottomHeight - 1));
       }
 
       g2.setFont(ANNOTATION_FONT);

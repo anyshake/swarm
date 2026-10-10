@@ -4,7 +4,7 @@
   <groupId>gov.usgs.volcanoes</groupId>
   <artifactId>swarm</artifactId>
   <name>Swarm</name>
-  <version>3.2.0</version>
+  <version>3.5.2-anyshake.1</version>
   <description>Swarm is a Java application designed to display and analyze seismic waveforms in real-time. Swarm can connect to and read from a variety of different static and dynamics data sources, including Earthworm waveservers, IRIS DMCs, SEED and SAC files, and simple ASCII. Swarm has both time- and frequency-domain analysis tools, along with a simple but powerful mapping platfrom. A full-screen kiosk mode can act as a low-cost, low-maintenance replacement for paper drum recorders. Swarm was written by and for scientists and provides fine control over many different program settings and variables.</description>
   <url>https://volcanoes.usgs.gov/software/swarm</url>
   <issueManagement>
@@ -55,6 +55,15 @@
         <active>true</active>
       </properties>
     </developer>
+    <developer>
+      <id>kfrechette</id>
+      <name>Kevin Frechette</name>
+      <email>kfrechette@contractor.usgs.gov</email>
+      <organization>ISTI</organization>
+      <properties>
+        <active>true</active>
+      </properties>
+    </developer>
   </developers>
   <contributors>
     <contributor>
@@ -76,7 +85,7 @@
   <licenses>
     <license>
       <name>CC0 1.0 Universal</name>
-      <url>http://creativecommons.org/publicdomain/zero/1.0/</url>
+      <url>https://creativecommons.org/publicdomain/zero/1.0/</url>
       <distribution>repo</distribution>
     </license>
   </licenses>
@@ -196,6 +205,27 @@
     </pluginManagement>
     <plugins>
       <plugin>
+        <artifactId>maven-install-plugin</artifactId>
+        <version>3.1.2</version>
+        <executions>
+          <execution>
+            <id>install-jar-lib</id>
+            <phase>validate</phase>
+            <goals>
+              <goal>install-file</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <groupId>edu.iris</groupId>
+          <artifactId>java-seed</artifactId>
+          <version>${java-seed-version}</version>
+          <packaging>jar</packaging>
+          <file>${lib-directory}/${java-seed-jar}</file>
+          <generatePom>true</generatePom>
+        </configuration>
+      </plugin>
+      <plugin>
         <artifactId>maven-compiler-plugin</artifactId>
         <version>3.8.0</version>
         <configuration>
@@ -205,7 +235,7 @@
       </plugin>
       <plugin>
         <artifactId>maven-shade-plugin</artifactId>
-        <version>3.2.0</version>
+        <version>3.2.1</version>
         <executions>
           <execution>
             <phase>package</phase>
@@ -216,9 +246,9 @@
               <minimizeJar>true</minimizeJar>
               <filters>
                 <filter>
-                  <artifact>log4j:log4j</artifact>
+                  <artifact>ch.qos.logback:*</artifact>
                   <includes>
-                    <include>org/apache/log4j/**</include>
+                    <include>ch/qos/logback/**</include>
                   </includes>
                 </filter>
                 <filter>
@@ -278,11 +308,10 @@
                   <include>com.martiansoftware:jsap</include>
                   <include>net.sourceforge.jtransforms:jtransforms</include>
                   <include>org.slf4j:*</include>
-                  <include>log4j:log4j</include>
-                  <include>net.alomax:*</include>
+                  <include>ch.qos.logback:*</include>
                   <include>edu.sc.seis:*</include>
                   <include>colt:colt</include>
-                  <include>edu.iris:JavaSeedLite</include>
+                  <include>edu.iris:java-seed</include>
                   <include>opensymphony:oscache</include>
                   <include>gov.usgs.earthquake:messageUtils</include>
                   <include>com.sun.xml.bind:jaxb-impl</include>
@@ -371,11 +400,8 @@
   </build>
   <repositories>
     <repository>
-      <releases>
-        <checksumPolicy>true</checksumPolicy>
-      </releases>
       <id>volcanoes</id>
-      <url>http://volcanoes.usgs.gov/software/maven2/</url>
+      <url>https://volcanoes.usgs.gov/software/maven2/</url>
     </repository>
   </repositories>
   <dependencies>
@@ -411,12 +437,15 @@
     </site>
   </distributionManagement>
   <properties>
+    <lib-directory>${project.basedir}/lib</lib-directory>
     <junit-platform.version>5.3.1</junit-platform.version>
-    <version.template.file>src/main/resources/Version.java.template</version.template.file>
-    <version.file>src/main/java/gov/usgs/volcanoes/swarm/Version.java</version.file>
+    <java-seed-version>3.8.6</java-seed-version>
     <junit.jupiter.version>5.5.2</junit.jupiter.version>
-    <maven.compiler.source>1.8</maven.compiler.source>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <java-seed-jar>java-seed-${java-seed-version}.jar</java-seed-jar>
     <maven.compiler.target>1.8</maven.compiler.target>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <version.file>src/main/java/gov/usgs/volcanoes/swarm/Version.java</version.file>
+    <maven.compiler.source>1.8</maven.compiler.source>
+    <version.template.file>src/main/resources/Version.java.template</version.template.file>
   </properties>
 </project>

@@ -15,7 +15,6 @@ import gov.usgs.volcanoes.swarm.wave.SwarmMultiMonitors;
 import gov.usgs.volcanoes.swarm.wave.WaveClipboardFrame;
 import gov.usgs.volcanoes.swarm.wave.WaveViewPanel;
 import gov.usgs.volcanoes.swarm.wave.WaveViewSettings;
-import gov.usgs.volcanoes.swarm.wave.WaveViewerFrame;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.File;
@@ -199,8 +198,10 @@ public class SwarmLayout implements Comparable<SwarmLayout> {
       final SeismicDataSource sds = SwarmConfig.getInstance().getSource(cf.getString("source"));
       if (sds != null && DataChooser.getInstance().isSourceOpened(sds.getName())) {
         final MultiMonitor mm = SwarmMultiMonitors.getMonitor(sds);
-        mm.processLayout(cf);
-        mm.setVisible(true);
+        if (mm != null) {
+          mm.processLayout(cf);
+          mm.setVisible(true);
+        }
       }
     }
   }
@@ -232,10 +233,7 @@ public class SwarmLayout implements Comparable<SwarmLayout> {
       final ConfigFile cf = config.getSubConfig(wave);
       final SeismicDataSource sds = SwarmConfig.getInstance().getSource(cf.getString("source"));
       String channel = cf.getString("channel");
-      WaveViewSettings wvs = new WaveViewSettings();
-      wvs.set(cf);
-      WaveViewerFrame wvf = Swarm.openRealtimeWave(sds, channel, wvs);
-      wvf.processStandardLayout(cf);
+      Swarm.openRealtimeWave(sds, channel, cf);
     }
   }
 

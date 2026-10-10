@@ -31,11 +31,11 @@ public final class SwarmMultiMonitors {
    * Get monitor.
    * 
    * @param source seismic data source
-   * @return
+   * @return the monitor or null if not allowed
    */
   public static MultiMonitor getMonitor(SeismicDataSource source) {
     MultiMonitor monitor = monitors.get(source.getName());
-    if (monitor == null) {
+    if (monitor == null && source.allowRealtime()) {
       monitor = new MultiMonitor(source);
       monitors.put(source.getName(), monitor);
       SwarmInternalFrames.add(monitor);
@@ -50,8 +50,10 @@ public final class SwarmMultiMonitors {
    * @param channel channel string
    */
   public static void monitorChannelSelected(SeismicDataSource source, String channel) {
-    MultiMonitor monitor = getMonitor(source);
-    monitor.setVisible(true);
-    monitor.addChannel(channel);
+    final MultiMonitor monitor = getMonitor(source);
+    if (monitor != null) {
+      monitor.setVisible(true);
+      monitor.addChannel(channel);
+    }
   }
 }

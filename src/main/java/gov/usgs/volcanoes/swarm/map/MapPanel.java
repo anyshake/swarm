@@ -1077,60 +1077,32 @@ public class MapPanel extends JPanel {
   private class MapImagePanel extends JPanel {
     private static final long serialVersionUID = 1L;
 
-    private static final long RULER_BREAK_SQ = 100L * 100L;
-    private final Font labelFont = Font.decode("dialog-plain-12");
-
-    private boolean rulerBreaks(final int x0, final int y0, final int x1, final int y1) {
-      final int dx = x1 - x0;
-      final int dy = y1 - y0;
-      final long squared = (long) dx * dx + (long) dy * dy;
-      return squared < 0 || squared > RULER_BREAK_SQ;
-    }
-
-    private BasicStroke mapLineStroke;
-    private Color mapLinePaint;
-    private int cachedLineWidth = Integer.MIN_VALUE;
-    private int cachedLineColor;
-    private final GeneralPath rulerPath = new GeneralPath();
-
-    private void applyMapLineStyle(final Graphics2D g2) {
-      int width = swarmConfig.mapLineWidth;
-      int color = swarmConfig.mapLineColor;
-      if (mapLineStroke == null || width != cachedLineWidth) {
-        mapLineStroke = new BasicStroke(width);
-        cachedLineWidth = width;
-      }
-      if (mapLinePaint == null || color != cachedLineColor) {
-        mapLinePaint = new Color(color);
-        cachedLineColor = color;
-      }
-      g2.setStroke(mapLineStroke);
-      g2.setColor(mapLinePaint);
-    }
-
     private void paintRadius(final Graphics2D g2) {
       final Point2D.Double lonLat = getLonLat(mouseNow.x, mouseNow.y);
       final Point2D.Double origin = getLonLat(mouseDown.x, mouseDown.y);
       final double d = Projection.distanceBetweenM(origin, lonLat);
       final int n = 720;
       final Point2D.Double[] pts = Projection.getPointsFrom(origin, d, n);
-      final GeneralPath gp = rulerPath;
-      gp.reset();
+      final GeneralPath gp = new GeneralPath();
       Point2D.Double xy = getXy(pts[0].x, pts[0].y);
-      int lastX = (int) Math.round(xy.x);
-      int lastY = (int) Math.round(xy.y);
-      gp.moveTo(lastX - 2, lastY - 1);
+      Point lastXy = new Point();
+      lastXy.x = (int) Math.round(xy.x);
+      lastXy.y = (int) Math.round(xy.y);
+      gp.moveTo(lastXy.x - 2, lastXy.y - 1);
       for (int i = 1; i <= pts.length; i++) {
         xy = getXy(pts[i % n].x, pts[i % n].y);
-        int thisX = (int) Math.round(xy.x);
-        int thisY = (int) Math.round(xy.y);
-        if (rulerBreaks(lastX, lastY, thisX, thisY)) {
-          gp.moveTo(thisX - 2, thisY - 1);
+        final Point thisXy = new Point();
+        thisXy.x = (int) Math.round(xy.x);
+        thisXy.y = (int) Math.round(xy.y);
+        final double a = thisXy.x - lastXy.x;
+        final double b = thisXy.y - lastXy.y;
+        final double dist = Math.sqrt(a * a + b * b);
+        if (dist > 100) {
+          gp.moveTo(thisXy.x - 2, thisXy.y - 1);
         } else {
-          gp.lineTo(thisX - 2, thisY - 1);
+          gp.lineTo(thisXy.x - 2, thisXy.y - 1);
         }
-        lastX = thisX;
-        lastY = thisY;
+        lastXy = thisXy;
       }
       g2.setColor(Color.YELLOW);
       g2.draw(gp);
@@ -1139,27 +1111,30 @@ public class MapPanel extends JPanel {
     private void paintGreatCircleRoute(final Graphics2D g2) {
       final Point2D.Double lonLat = getLonLat(mouseNow.x, mouseNow.y);
       Point2D.Double origin = getLonLat(mouseDown.x, mouseDown.y);
-      final GeneralPath gp = rulerPath;
-      gp.reset();
+      final GeneralPath gp = new GeneralPath();
       Point2D.Double xy = getXy(origin.x, origin.y);
-      int lastX = (int) Math.round(xy.x);
-      int lastY = (int) Math.round(xy.y);
-      gp.moveTo(lastX - 2, lastY - 1);
+      Point lastXy = new Point();
+      lastXy.x = (int) Math.round(xy.x);
+      lastXy.y = (int) Math.round(xy.y);
+      gp.moveTo(lastXy.x - 2, lastXy.y - 1);
       double d = Projection.distanceBetweenM(origin, lonLat);
       while (d > 20 * 1000) {
         final double az = Projection.azimuthTo(origin, lonLat);
         final Point2D.Double p0 = Projection.getPointFrom(origin, 20 * 1000, az);
 
         xy = getXy(p0.x, p0.y);
-        int thisX = (int) Math.round(xy.x);
-        int thisY = (int) Math.round(xy.y);
-        if (rulerBreaks(lastX, lastY, thisX, thisY)) {
-          gp.moveTo(thisX - 2, thisY - 1);
+        final Point thisXy = new Point();
+        thisXy.x = (int) Math.round(xy.x);
+        thisXy.y = (int) Math.round(xy.y);
+        final double a = thisXy.x - lastXy.x;
+        final double b = thisXy.y - lastXy.y;
+        final double dist = Math.sqrt(a * a + b * b);
+        if (dist > 100) {
+          gp.moveTo(thisXy.x - 2, thisXy.y - 1);
         } else {
-          gp.lineTo(thisX - 2, thisY - 1);
+          gp.lineTo(thisXy.x - 2, thisXy.y - 1);
         }
-        lastX = thisX;
-        lastY = thisY;
+        lastXy = thisXy;
 
         origin = p0;
         d = Projection.distanceBetweenM(origin, lonLat);
@@ -1189,16 +1164,17 @@ public class MapPanel extends JPanel {
         }
 
         g.setXORMode(Color.WHITE);
-        if (lines != null && !lines.isEmpty()) {
-          final Stroke savedStroke = g2.getStroke();
-          final Color savedColor = g2.getColor();
-          g2.setPaintMode();
-          applyMapLineStyle(g2);
+        if (lines != null) {
           for (final Line2D.Double line : lines) {
+            final Stroke s = g2.getStroke();
+            final Color c = g2.getColor();
+            g2.setPaintMode();
+            g2.setStroke(new BasicStroke(swarmConfig.mapLineWidth));
+            g2.setColor(new Color(swarmConfig.mapLineColor));
             g2.draw(line);
+            g2.setStroke(s);
+            g2.setColor(c);
           }
-          g2.setStroke(savedStroke);
-          g2.setColor(savedColor);
         }
         g.setPaintMode();
 
@@ -1221,7 +1197,7 @@ public class MapPanel extends JPanel {
         final Object oldaa = g2.getRenderingHint(RenderingHints.KEY_ANTIALIASING);
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         final AffineTransform at = g2.getTransform();
-        g2.setFont(labelFont);
+        g2.setFont(Font.decode("dialog-plain-12"));
 
         g2.translate(-dx, -dy);
         for (MapLayer layer : layers) {

@@ -12,6 +12,8 @@ import gov.usgs.volcanoes.swarm.SwarmConfig;
  * @author Dan Cervelli
  */
 public class HelicorderViewerSettings {
+  /** Maximum auto scroll size */
+  public static final int MAX_AUTO_SCROLL_SIZE = 24;
   public String channel;
   public int timeChunk; // seconds
   public int span; // minutes
@@ -48,7 +50,7 @@ public class HelicorderViewerSettings {
     waveZoomOffset = 30;
     bottomTime = Double.NaN;
     refreshInterval = 15;
-    scrollSize = 24;
+    scrollSize = 0; // auto
     forceCenter = false;
     clipBars = 21;
 

@@ -1,6 +1,5 @@
 package gov.usgs.volcanoes.swarm;
 
-import com.jgoodies.looks.plastic.Plastic3DLookAndFeel;
 import gov.usgs.volcanoes.core.configfile.ConfigFile;
 import gov.usgs.volcanoes.core.data.Wave;
 import gov.usgs.volcanoes.core.time.CurrentTime;
@@ -21,7 +20,6 @@ import gov.usgs.volcanoes.swarm.rsam.RsamViewerFrame;
 import gov.usgs.volcanoes.swarm.wave.MultiMonitor;
 import gov.usgs.volcanoes.swarm.wave.WaveClipboardFrame;
 import gov.usgs.volcanoes.swarm.wave.WaveViewPanel;
-import gov.usgs.volcanoes.swarm.wave.WaveViewSettings;
 import gov.usgs.volcanoes.swarm.wave.WaveViewerFrame;
 import java.awt.Dimension;
 import java.awt.Frame;
@@ -55,7 +53,10 @@ import org.slf4j.LoggerFactory;
  * @author Dan Cervelli, Peter Cervelli, and Thomas Parker.
  */
 public class Swarm extends JFrame implements InternalFrameListener {
-
+  static {
+    // do this first
+    LoggerConfiguration.init();
+  }
   private static final Logger LOGGER = LoggerFactory.getLogger(Swarm.class);
 
   private static final long serialVersionUID = -1;
@@ -99,6 +100,7 @@ public class Swarm extends JFrame implements InternalFrameListener {
 
     config = SwarmConfig.getInstance();
     config.createConfig(args);
+    TrustAllCerts.trustAllCerts(false);
 
     cache = CachedDataSource.getInstance();
 
@@ -598,28 +600,17 @@ public class Swarm extends JFrame implements InternalFrameListener {
   /**
    * Open wave viewer frame.
    * 
-   * @param source wave data source
+   * @param source  wave data source
    * @param channel wave channel
-   * @return wave viewer frame
+   * @param cf      the config file or null if none
+   * @return wave viewer frame or null if not allowed
    */
   public static WaveViewerFrame openRealtimeWave(final SeismicDataSource source,
-      final String channel) {
-    final WaveViewerFrame frame = new WaveViewerFrame(source, channel);
-    SwarmInternalFrames.add(frame);
-    return frame;
-  }
-
-  /**
-   * Open wave viewer frame.
-   * 
-   * @param source wave data source
-   * @param channel wave channel
-   * @param settings wave view settings
-   * @return wave viewer frame
-   */
-  public static WaveViewerFrame openRealtimeWave(final SeismicDataSource source,
-      final String channel, final WaveViewSettings settings) {
-    final WaveViewerFrame frame = new WaveViewerFrame(source, channel, settings);
+      final String channel, final ConfigFile cf) {
+    if (!source.allowRealtime()) {
+      return null;
+    }
+    final WaveViewerFrame frame = new WaveViewerFrame(source, channel, cf);
     SwarmInternalFrames.add(frame);
     return frame;
   }
@@ -667,26 +658,6 @@ public class Swarm extends JFrame implements InternalFrameListener {
     SwarmInternalFrames.add(frame);
     return frame;
   }
-
-  // public static PickerFrame openPicker(final WaveViewPanel insetWavePanel) {
-  // PickerWavePanel p = new PickerWavePanel(insetWavePanel);
-  // p.setDataSource(insetWavePanel.getDataSource().getCopy());
-  // PickerFrame pickerFrame = new PickerFrame();
-  // pickerFrame.setVisible(true);
-  // pickerFrame.requestFocus();
-  // SwarmInternalFrames.add(pickerFrame);
-  // pickerFrame.setBaseWave(p);
-  // return pickerFrame;
-  // }
-
-  // public static PickerFrame openPicker(Event event) {
-  // PickerFrame pickerFrame = new PickerFrame(event);
-  // pickerFrame.setVisible(true);
-  // pickerFrame.requestFocus();
-  // SwarmInternalFrames.add(pickerFrame);
-  // return pickerFrame;
-  // }
-
 
   /**
    * Save layout.
@@ -1123,7 +1094,6 @@ public class Swarm extends JFrame implements InternalFrameListener {
    */
   public static void main(final String[] args) {
     try {
-      UIManager.setLookAndFeel(new Plastic3DLookAndFeel());
       UIManager.put("InternalFrame.border", SwarmUtil.getInternalFrameBorder());
     } catch (final Exception e) {
       //
@@ -1150,6 +1120,4 @@ public class Swarm extends JFrame implements InternalFrameListener {
 
     return eventFrame;
   }
-
-
 }

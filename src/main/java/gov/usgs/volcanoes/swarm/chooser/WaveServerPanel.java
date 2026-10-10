@@ -42,7 +42,7 @@ public class WaveServerPanel extends DataSourcePanel {
 
   /**
    * Reset source.
-   * 
+   *
    * @see gov.usgs.volcanoes.swarm.chooser.DataSourcePanel#resetSource(java.lang.String)
    */
   public void resetSource(String source) {

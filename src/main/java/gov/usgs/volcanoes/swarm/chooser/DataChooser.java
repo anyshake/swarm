@@ -510,7 +510,7 @@ public class DataChooser extends JPanel {
             List<Pair<ServerNode, String>> channels = getSelections();
             if (channels != null) {
               for (Pair<ServerNode, String> pair : channels) {
-                Swarm.openRealtimeWave(pair.item1.getSource(), pair.item2);
+                Swarm.openRealtimeWave(pair.item1.getSource(), pair.item2, null);
               }
             }
             return null;
@@ -635,6 +635,7 @@ public class DataChooser extends JPanel {
     actionPanel.add(mapButton);
 
     timeBox = new JComboBox<String>(TIME_VALUES);
+    timeBox.setToolTipText("'YYYYMMDD' or 'YYYYMMDDhhmm' or 'Now'");
     for (String ut : SwarmConfig.getInstance().userTimes) {
       if (ut.length() > 0) {
         timeBox.addItem(ut);

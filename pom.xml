@@ -1,12 +1,12 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0"
+<project
+	xmlns="http://maven.apache.org/POM/4.0.0"
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>gov.usgs.volcanoes</groupId>
 	<artifactId>swarm</artifactId>
-	<version>3.2.1-anyshake.4</version>
+	<version>3.5.2-anyshake.1</version>
 	<packaging>jar</packaging>
-
 	<name>Swarm</name>
 	<url>https://volcanoes.usgs.gov/software/swarm</url>
 	<description>Swarm is a Java application designed to display and analyze seismic waveforms in real-time. Swarm can connect to and read from a variety of different static and dynamics data sources, including Earthworm waveservers, IRIS DMCs, SEED and SAC files, and simple ASCII. Swarm has both time- and frequency-domain analysis tools, along with a simple but powerful mapping platfrom. A full-screen kiosk mode can act as a low-cost, low-maintenance replacement for paper drum recorders. Swarm was written by and for scientists and provides fine control over many different program settings and variables. </description>
@@ -18,16 +18,17 @@
 		<maven.compiler.target>1.8</maven.compiler.target>
 		<junit.jupiter.version>5.5.2</junit.jupiter.version>
 		<junit-platform.version>5.3.1</junit-platform.version>
+		<lib-directory>${project.basedir}/lib</lib-directory>
+		<java-seed-version>3.8.6</java-seed-version>
+		<java-seed-jar>java-seed-${java-seed-version}.jar</java-seed-jar>
 	</properties>
-
 	<licenses>
 		<license>
 			<name>CC0 1.0 Universal</name>
-			<url>http://creativecommons.org/publicdomain/zero/1.0/</url>
+			<url>https://creativecommons.org/publicdomain/zero/1.0/</url>
 			<distribution>repo</distribution>
 		</license>
 	</licenses>
-
 	<developers>
 		<developer>
 			<id>tparker</id>
@@ -72,8 +73,16 @@
 				<active>true</active>
 			</properties>
 		</developer>
+		<developer>
+			<id>kfrechette</id>
+			<name>Kevin Frechette</name>
+			<email>kfrechette@contractor.usgs.gov</email>
+			<organization>ISTI</organization>
+			<properties>
+				<active>true</active>
+			</properties>
+		</developer>
 	</developers>
-
 	<contributors>
 		<contributor>
 			<name>Kevin Frechette (ISTI)</name>
@@ -91,12 +100,10 @@
 			<name>Ivan Henson</name>
 		</contributor>
 	</contributors>
-
 	<issueManagement>
 		<url>https://code.usgs.gov/vsc/swarm/issues</url>
 		<system>GitLab</system>
 	</issueManagement>
-
 	<scm>
 		<connection>scm:git:git@code.usgs.gov:vsc/swarm.git
 		</connection>
@@ -104,7 +111,6 @@
 		</developerConnection>
 		<url>git@code.usgs.gov:vsc/swarm.git</url>
 	</scm>
-
 	<distributionManagement>
 		<repository>
 			<id>volcanoes.web</id>
@@ -117,19 +123,36 @@
 			<url>scm:git:https://code.usgs.gov/vsc/swarm.git</url>
 		</site>
 	</distributionManagement>
-
 	<repositories>
 		<repository>
 			<id>volcanoes</id>
-			<releases>
-				<checksumPolicy>warn</checksumPolicy>
-			</releases>
 			<url>https://volcanoes.usgs.gov/software/maven2/</url>
 		</repository>
 	</repositories>
-
 	<build>
 		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-install-plugin</artifactId>
+				<version>3.1.2</version>
+				<configuration>
+					<groupId>edu.iris</groupId>
+					<artifactId>java-seed</artifactId>
+					<version>${java-seed-version}</version>
+					<packaging>jar</packaging>
+					<file>${lib-directory}/${java-seed-jar}</file>
+					<generatePom>true</generatePom>
+				</configuration>
+				<executions>
+					<execution>
+						<id>install-jar-lib</id>
+						<goals>
+							<goal>install-file</goal>
+						</goals>
+						<phase>validate</phase>
+					</execution>
+				</executions>
+			</plugin>
 			<plugin>
 				<artifactId>maven-compiler-plugin</artifactId>
 				<version>3.8.0</version>
@@ -141,7 +164,7 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-shade-plugin</artifactId>
-				<version>3.2.0</version>
+				<version>3.2.1</version>
 				<executions>
 					<execution>
 						<phase>package</phase>
@@ -149,12 +172,12 @@
 							<goal>shade</goal>
 						</goals>
 						<configuration>
-							<minimizeJar>false</minimizeJar>
+							<minimizeJar>true</minimizeJar>
 							<filters>
 								<filter>
-									<artifact>log4j:log4j</artifact>
+									<artifact>ch.qos.logback:*</artifact>
 									<includes>
-										<include>org/apache/log4j/**</include>
+										<include>ch/qos/logback/**</include>
 									</includes>
 								</filter>
 								<filter>
@@ -214,11 +237,10 @@
 									<include>com.martiansoftware:jsap</include>
 									<include>net.sourceforge.jtransforms:jtransforms</include>
 									<include>org.slf4j:*</include>
-									<include>log4j:log4j</include>
-									<include>net.alomax:*</include>
+									<include>ch.qos.logback:*</include>
 									<include>edu.sc.seis:*</include>
 									<include>colt:colt</include>
-									<include>edu.iris:JavaSeedLite</include>
+									<include>edu.iris:java-seed</include>
 									<include>opensymphony:oscache</include>
 									<include>gov.usgs.earthquake:messageUtils</include>
 									<include>com.sun.xml.bind:jaxb-impl</include>
@@ -290,7 +312,6 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-assembly-plugin</artifactId>
-				<version>3.3.0</version>
 				<configuration>
 					<descriptors>
 						<descriptor>src/assembly/swarmBin.xml</descriptor>
@@ -298,8 +319,10 @@
 				</configuration>
 				<executions>
 					<execution>
-						<id>make-assembly</id> <!-- this is used for inheritance merges -->
-						<phase>package</phase> <!-- bind to the packaging phase -->
+						<id>make-assembly</id>
+						<!-- this is used for inheritance merges -->
+						<phase>package</phase>
+						<!-- bind to the packaging phase -->
 						<goals>
 							<goal>single</goal>
 						</goals>
@@ -307,7 +330,6 @@
 				</executions>
 			</plugin>
 		</plugins>
-
 		<pluginManagement>
 			<plugins>
 				<plugin>
@@ -409,7 +431,6 @@
 				</plugin>
 			</plugins>
 		</pluginManagement>
-
 		<extensions>
 			<extension>
 				<groupId>org.apache.maven.wagon</groupId>
@@ -418,7 +439,6 @@
 			</extension>
 		</extensions>
 	</build>
-
 	<dependencies>
 		<dependency>
 			<groupId>com.martiansoftware</groupId>
@@ -446,11 +466,6 @@
 			<version>2.6.0</version>
 		</dependency>
 		<dependency>
-			<groupId>edu.iris</groupId>
-			<artifactId>JavaSeedLite</artifactId>
-			<version>3.8.4</version>
-		</dependency>
-		<dependency>
 			<groupId>edu.sc.seis</groupId>
 			<artifactId>seedCodec</artifactId>
 			<version>1.0.11</version>
@@ -458,12 +473,7 @@
 		<dependency>
 			<groupId>edu.sc.seis</groupId>
 			<artifactId>seisFile</artifactId>
-			<version>2.0.0</version>
-		</dependency>
-		<dependency>
-			<groupId>net.alomax</groupId>
-			<artifactId>seedlink_lite</artifactId>
-			<version>1.2.2</version>
+			<version>1.8.6</version>
 		</dependency>
 		<dependency>
 			<groupId>net.sourceforge.jtransforms</groupId>
@@ -473,7 +483,12 @@
 		<dependency>
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-api</artifactId>
-			<version>1.7.30</version>
+			<version>2.0.12</version>
+		</dependency>
+		<dependency>
+			<groupId>ch.qos.logback</groupId>
+			<artifactId>logback-classic</artifactId>
+			<version>1.3.15</version>
 		</dependency>
 		<dependency>
 			<groupId>gov.usgs.volcanoes</groupId>
@@ -483,7 +498,7 @@
 		<dependency>
 			<groupId>gov.usgs.volcanoes</groupId>
 			<artifactId>volcano-core</artifactId>
-			<version>3.1.0</version>
+			<version>4.1.0</version>
 		</dependency>
 		<dependency>
 			<groupId>gov.usgs.volcanoes</groupId>
@@ -498,7 +513,7 @@
 		<dependency>
 			<groupId>io.netty</groupId>
 			<artifactId>netty-all</artifactId>
-			<version>[4.1.60,)</version>
+			<version>[4.1.42,)</version>
 		</dependency>
 		<dependency>
 			<groupId>opensymphony</groupId>
@@ -534,7 +549,7 @@
 		<dependency>
 			<groupId>gov.usgs.volcanoes</groupId>
 			<artifactId>wwsclient</artifactId>
-			<version>2.0.0</version>
+			<version>3.0.0</version>
 		</dependency>
 	</dependencies>
 	<organization>

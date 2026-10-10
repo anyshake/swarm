@@ -2,9 +2,23 @@ package gov.usgs.volcanoes.swarm;
 
 import com.jgoodies.looks.plastic.PlasticLookAndFeel;
 import java.awt.Component;
+import java.awt.Desktop;
 import java.awt.Graphics;
 import java.awt.Insets;
 import java.awt.event.ActionListener;
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.PrintStream;
+import java.net.URI;
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
+import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoField;
+import java.time.temporal.TemporalAccessor;
+import java.util.Date;
+
 import javax.swing.AbstractButton;
 import javax.swing.BorderFactory;
 import javax.swing.ImageIcon;
@@ -12,6 +26,7 @@ import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JInternalFrame;
 import javax.swing.JSplitPane;
+import javax.swing.JTextArea;
 import javax.swing.JToggleButton;
 import javax.swing.JToolBar;
 import javax.swing.border.AbstractBorder;
@@ -19,14 +34,71 @@ import javax.swing.border.Border;
 import javax.swing.plaf.SplitPaneUI;
 import javax.swing.plaf.UIResource;
 import javax.swing.plaf.basic.BasicSplitPaneUI;
+import javax.swing.text.JTextComponent;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * $Log: not supported by cvs2svn $ Revision 1.1 2006/04/17 04:16:36 dcervelli More 1.3 changes.
  *
  * @author Dan Cervelli
  */
-public class SwarmUtil {
-  private static final Insets ZERO_INSETS = new Insets(0, 0, 0, 0);
+public class SwarmUtil implements SwarmConst {
+  private static final Logger LOGGER = LoggerFactory.getLogger(SwarmUtil.class);
+  private static final DateTimeFormatter DATE_FORMATTER;
+  private static final DateTimeFormatter DATE_PARSER;
+  static {
+    DATE_FORMATTER =
+        new DateTimeFormatterBuilder().appendInstant(3).toFormatter();
+    DATE_PARSER = new DateTimeFormatterBuilder()
+    .append(DateTimeFormatter.ISO_LOCAL_DATE).appendLiteral('T')
+    .append(DateTimeFormatter.ISO_LOCAL_TIME).parseLenient()
+    .parseCaseInsensitive().optionalStart().appendOffsetId()
+    .optionalEnd().optionalStart().appendOffset("+HHMMSS", "Z")
+    .optionalEnd().optionalStart().appendOffset("+HHMM", "Z")
+    .optionalEnd().optionalStart().appendOffset("+HH", "Z")
+    .optionalEnd().parseDefaulting(ChronoField.OFFSET_SECONDS, 0)
+    .toFormatter();
+  }
+
+  /**
+   * Launches the default browser to display a {@code URI}.
+   * 
+   * @param uri the URI to be displayed in the user default browser
+   * @see #isBrowseSupported()
+   */
+  public static void browse(URI uri) {
+    try {
+      Desktop.getDesktop().browse(uri);
+    } catch (Exception ex) {
+      LOGGER.warn(ex.toString());
+    }
+  }
+
+  /**
+   * Constructs a URI by parsing the given string.
+   * 
+   * @param str The string to be parsed into a URI.
+   * @return the URI or null if error.
+   */
+  public static URI createURI(String str) {
+    URI uri = null;
+    try {
+      uri = new URI(str);
+    } catch (Exception ex) {
+    }
+    return uri;
+  }
+
+  /**
+   * Tests whether the "browse" action is supported on the current platform.
+   * 
+   * @return true if supported, false otherwise.
+   */
+  public static boolean isBrowseSupported() {
+    return Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE);
+  }
 
   /**
    * Create stripped split pane.
@@ -45,6 +117,22 @@ public class SwarmUtil {
       basicUi.getDivider().setBorder(BorderFactory.createEmptyBorder());
     }
     return split;
+  }
+
+  /**
+   * Create a text component.
+   * @param text the text to be displayed.
+   * @param columns the number of columns.
+   * @return the text component.
+   */
+  public static JTextComponent createTextComponent(String text, int columns) {
+    JTextArea c = new JTextArea(text, 0, columns);
+    c.setBackground(null);
+    if (columns != 0) {
+      c.setLineWrap(true);
+      c.setWrapStyleWord(true);
+    }
+    return c;
   }
 
   /**
@@ -101,6 +189,26 @@ public class SwarmUtil {
     button.setFocusable(false);
     button.setMargin(ZERO_INSETS);
     button.setToolTipText(toolTip);
+  }
+
+  /**
+   * Get the text for the specified date.
+   * 
+   * @param date the date.
+   * @return the text.
+   */
+  public static String getDateText(final Date date) {
+    return getDateText(Instant.ofEpochMilli(date.getTime()));
+  }
+
+  /**
+   * Get the text for the specified date.
+   * 
+   * @param temporal the temporal object to format, not null.
+   * @return the text.
+   */
+  public static String getDateText(final TemporalAccessor temporal) {
+    return DATE_FORMATTER.format(temporal);
   }
 
   /**
@@ -162,6 +270,58 @@ public class SwarmUtil {
 
     public Insets getBorderInsets(Component c) {
       return ((JInternalFrame) c).isMaximum() ? MAXIMIZED_INSETS : NORMAL_INSETS;
+    }
+  }
+
+  /**
+   * Get the date for the text.
+   * 
+   * @param s the text.
+   * @return the date or null if none or error.
+   */
+  public static Date parseDate(final String s) {
+    try {
+      Instant date = parseInstant(s);
+      return new Date(date.toEpochMilli());
+    } catch (Exception ex) {
+    }
+    return null;
+  }
+
+  /**
+   * Parse the date text.
+   * 
+   * @param s the text.
+   * @return the parsed temporal object, not null.
+   */
+  public static TemporalAccessor parseDateText(final String s) {
+    return DATE_PARSER.parse(s);
+  }
+
+  /**
+   * Get the instant for the text.
+   * 
+   * @param s the text.
+   * @return the instant.
+   * @throws DateTimeParseException if unable to parse the requested result
+   */
+  public static Instant parseInstant(final String s) throws DateTimeParseException {
+    return Instant.from(DATE_PARSER.parse(s));
+  }
+
+  /**
+   * Write the contents of the specified URL.
+   * 
+   * @param in  the input.
+   * @param out the output.
+   * @throws Exception if error.
+   */
+  public static void writeText(InputStream in, PrintStream out) throws Exception {
+    String line;
+    try (BufferedReader br = new BufferedReader(new InputStreamReader(in))) {
+      while ((line = br.readLine()) != null) {
+        out.println(line);
+      }
     }
   }
 }

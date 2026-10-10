@@ -4,12 +4,12 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * Base channel information without groups. This class should be extended and the 'getGroups()'
- * method should be over-ridden if group support is desired.
+ * Base channel information without groups. This class should be extended and
+ * the 'getGroups()' method should be over-ridden if group support is desired.
  * 
  * @author Kevin Frechette (ISTI)
  */
-public class ChannelInfo extends AbstractChannelInfo {
+public class ChannelInfo extends AbstractChannelInfo implements Comparable<ChannelInfo> {
   /** The channel name. */
   private final String channel;
 
@@ -26,15 +26,14 @@ public class ChannelInfo extends AbstractChannelInfo {
    * Create the channel information.
    * 
    * @param stationInfo the station information.
-   * @param channel channel code
-   * @param location location code
+   * @param channel     channel code
+   * @param location    location code
    */
   public ChannelInfo(StationInfo stationInfo, String channel, String location) {
     this.stationInfo = stationInfo;
     this.channel = channel;
     this.location = location;
-    formattedScnl = ChannelUtil.getFormattedScnl(stationInfo.getStation(), channel,
-        stationInfo.getNetwork(), location);
+    formattedScnl = ChannelUtil.getFormattedScnl(stationInfo.getStation(), channel, stationInfo.getNetwork(), location);
   }
 
   /**
@@ -70,7 +69,7 @@ public class ChannelInfo extends AbstractChannelInfo {
     if (ss.length > 6) {
       elevation = StationInfo.parseDouble(ss[6]);
     }
-    stationInfo = new StationInfo(station, network, latitude, longitude, elevation);
+    stationInfo = new StationInfo(station, network, latitude, longitude, elevation, null);
     this.channel = channel;
     this.location = location;
     formattedScnl = ChannelUtil.getFormattedScnl(station, channel, network, location);
@@ -79,98 +78,71 @@ public class ChannelInfo extends AbstractChannelInfo {
   /**
    * Create the channel information.
    * 
-   * @param station the station name.
-   * @param channel the channel name.
-   * @param network the network name.
-   * @param location the location name.
-   * @param latitude the latitude.
+   * @param station   the station name.
+   * @param channel   the channel name.
+   * @param network   the network name.
+   * @param location  the location name.
+   * @param latitude  the latitude.
    * @param elevation the elevation
    * @param longitude the longitude.
-   * @param siteName the site name.
+   * @param siteName  the site name.
    */
-  public ChannelInfo(String station, String channel, String network, String location,
-      double latitude, double longitude, double elevation, String siteName) {
-    this(new StationInfo(station, network, latitude, longitude, elevation, siteName), channel,
-        location);
+  public ChannelInfo(String station, String channel, String network, String location, double latitude, double longitude,
+      double elevation, String siteName) {
+    this(new StationInfo(station, network, latitude, longitude, elevation, siteName), channel, location);
   }
 
-  /**
-   * Get the channel name.
-   * 
-   * @return the channel name.
-   */
+  @Override
+  public int compareTo(ChannelInfo o) {
+    return compareTo((AbstractChannelInfo) o);
+  }
+
+  @Override
   public String getChannel() {
     return channel;
   }
 
-  /**
-   * Get the formatted SCNL.
-   * 
-   * @return the formatted SCNL.
-   */
+  @Override
   public String getFormattedScnl() {
     return formattedScnl;
   }
 
-  /**
-   * Get the groups.
-   * 
-   * @return the list of groups.
-   */
+  @Override
   public List<String> getGroups() {
     return Collections.emptyList();
   }
 
-  /**
-   * Get the latitude.
-   * 
-   * @return the latitude.
-   */
+  @Override
+  public double getHeight() {
+    return stationInfo.getElevation();
+  }
+
+  @Override
   public double getLatitude() {
     return stationInfo.getLatitude();
   }
 
-  /**
-   * Get the location.
-   * 
-   * @return the location.
-   */
+  @Override
   public String getLocation() {
     return location;
   }
 
-  /**
-   * Get the longitude.
-   * 
-   * @return the longitude.
-   */
+  @Override
   public double getLongitude() {
     return stationInfo.getLongitude();
   }
 
-  /**
-   * Get the network name.
-   * 
-   * @return the network name.
-   */
+  @Override
   public String getNetwork() {
     return stationInfo.getNetwork();
   }
 
-  /**
-   * Get the site name.
-   * 
-   * @return the site name.
-   */
+  @Override
   public String getSiteName() {
     return stationInfo.getSiteName();
   }
 
-  /**
-   * Get the station name.
-   * 
-   * @return the station name.
-   */
+  @Override
   public String getStation() {
     return stationInfo.getStation();
   }
@@ -182,15 +154,5 @@ public class ChannelInfo extends AbstractChannelInfo {
    */
   public StationInfo getStationInfo() {
     return stationInfo;
-  }
-
-
-  /**
-   * Get elevation.
-   * 
-   * @see gov.usgs.volcanoes.swarm.AbstractChannelInfo#getHeight()
-   */
-  public double getHeight() {
-    return stationInfo.getElevation();
   }
 }

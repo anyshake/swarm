@@ -41,7 +41,15 @@ public class SwarmFrame extends JInternalFrame {
     swarmConfig = SwarmConfig.getInstance();
   }
 
-  protected void processStandardLayout(ConfigFile cf) {
+  /**
+   * Process standard layout
+   * 
+   * @param cf the configuration or null if none
+   */
+  protected final void processStandardLayout(ConfigFile cf) {
+    if (cf == null) {
+      return;
+    }
     int x = Integer.parseInt(cf.getString("x"));
     int y = Integer.parseInt(cf.getString("y"));
     setLocation(x, y);

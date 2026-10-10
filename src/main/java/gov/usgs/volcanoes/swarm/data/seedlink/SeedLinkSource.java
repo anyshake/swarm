@@ -30,10 +30,20 @@ import org.slf4j.LoggerFactory;
 public class SeedLinkSource extends SeismicDataSource {
   /** The logger. */
   private static final Logger LOGGER = LoggerFactory.getLogger(SeedLinkSource.class);
-
-  // /** Info string prefix text or null if none. */
-  private static final String INFO_FILE_TEXT =
-      System.getProperty(DataSourceType.getShortName(SeedLinkSource.class) + "infofile");
+  /**
+   * Close when data not needed flag.
+   * 
+   * @see #notifyDataNotNeeded(String, double, double, GulperListener)
+   */
+  private static final boolean CLOSE_WHEN_DATA_NOT_NEEDED;
+  /** Info string prefix text or null if none. */
+  private static final String INFO_FILE_TEXT;
+  static {
+    CLOSE_WHEN_DATA_NOT_NEEDED =
+        Boolean.parseBoolean(System.getProperty("SEED_LINK_CLOSE_WHEN_DATA_NOT_NEEDED"));
+    INFO_FILE_TEXT =
+        System.getProperty(DataSourceType.getShortName(SeedLinkSource.class) + "infofile");
+  }
 
   /** The server host. */
   private String host;
@@ -44,18 +54,39 @@ public class SeedLinkSource extends SeismicDataSource {
   /** The server port. */
   private int port;
 
-  /** SeedLink client for real time updates. */
-  private SeedLinkClient realtimeClient = null;
+  /** SeedLink clients for real time updates. */
+  private final ConcurrentHashMap<String, SeedLinkClient> rtClients = new ConcurrentHashMap<>();
 
   /** SeedLink clients for past data. */
-  private ConcurrentHashMap<String, SeedLinkClient> clients =
-      new ConcurrentHashMap<String, SeedLinkClient>();
+  private final ConcurrentHashMap<String, SeedLinkClient> clients = new ConcurrentHashMap<>();
+
+  private final DoneListener clientsDoneListener;
+  private final DoneListener rtClientsDoneListener;
 
   /**
    * Default constructor.
    */
-  public SeedLinkSource() {}
-  
+  public SeedLinkSource() {
+    // done listeners to remove clients when they are done
+    clientsDoneListener = new DoneListener() {
+      @Override
+      public void done(String station) {
+        SeedLinkClient client = clients.remove(station);
+        if (client != null) {
+          LOGGER.debug("SeedLinkSource client done: {}", client);
+        }
+      }
+    };
+    rtClientsDoneListener = new DoneListener() {
+      @Override
+      public void done(String station) {
+        SeedLinkClient client = rtClients.remove(station);
+        if (client != null) {
+          LOGGER.debug("SeedLinkSource rtclient done: {}", client);
+        }
+      }
+    };
+  }
 
   /**
    * Parse config string.
@@ -66,7 +97,6 @@ public class SeedLinkSource extends SeismicDataSource {
     String[] ss = params.split(":");
     host = ss[0];
     port = Integer.parseInt(ss[1]);
-    realtimeClient = new SeedLinkClient(host, port);
     if (INFO_FILE_TEXT != null) {
       infoStringFile = new File(INFO_FILE_TEXT + host + port + ".xml");
     }
@@ -92,7 +122,7 @@ public class SeedLinkSource extends SeismicDataSource {
     String infoString = readChannelCache();
 
     if (infoString == null) {
-      infoString = realtimeClient.getInfoString("STREAMS");
+      infoString = new SeedLinkClient(host, port).getInfoString("STREAMS");
       writeChannelCache(infoString);
     }
 
@@ -102,7 +132,7 @@ public class SeedLinkSource extends SeismicDataSource {
         SeedLinkChannelInfo seedLinkChannelInfo = new SeedLinkChannelInfo(this, infoString);
         channels = seedLinkChannelInfo.getChannels();
       } catch (Exception ex) {
-        LOGGER.error("Cannot parse station list", ex);
+        LOGGER.error("SeedLinkSource Cannot parse station list", ex);
       }
     }
 
@@ -127,8 +157,8 @@ public class SeedLinkSource extends SeismicDataSource {
         MappedByteBuffer bb = fc.map(FileChannel.MapMode.READ_ONLY, 0, fc.size());
 
         return Charset.defaultCharset().decode(bb).toString();
-      } catch (IOException e) {
-        LOGGER.error("Cannot read seedlink channel cache. ({})", infoStringFile);
+      } catch (IOException ex) {
+        LOGGER.error("SeedLinkSource Cannot read seedlink channel cache. ({})", infoStringFile, ex);
       } finally {
         try {
           if (stream != null) {
@@ -157,8 +187,8 @@ public class SeedLinkSource extends SeismicDataSource {
     try {
       writer = new FileWriter(infoStringFile);
       writer.write(infoString);
-    } catch (IOException e) {
-      LOGGER.error("Cannot write seedlink channel cache. ({})", infoStringFile);
+    } catch (IOException ex) {
+      LOGGER.error("SeedLinkSource Cannot write seedlink channel cache. ({})", infoStringFile, ex);
     } finally {
       try {
         if (writer != null) {
@@ -181,28 +211,28 @@ public class SeedLinkSource extends SeismicDataSource {
    */
   public synchronized HelicorderData getHelicorder(String scnl, double t1, double t2,
       GulperListener gl) {
-    LOGGER.debug("getHelicorder: {} {} {}", scnl, J2kSec.toDateString(t1), J2kSec.toDateString(t2));
+    LOGGER.debug("SeedLinkSource getHelicorder: {} {} {}", scnl, J2kSec.toDateString(t1),
+        J2kSec.toDateString(t2));
     scnl = scnl.replace(" ", "$"); // just to be sure
     startRealtimeClient(scnl);
-    
+
     CachedDataSource cache = CachedDataSource.getInstance();
 
     HelicorderData hd = cache.getHelicorder(scnl, t1, t2, gl);
-    
-    if (hd == null || hd.rows()==0) { // no wave; go get all
+
+    if (hd == null || hd.rows() == 0) { // no wave; go get all
       double now = J2kSec.now();
       t2 = Math.min(now, t2);
       getData(scnl, t1, t2);
       hd = cache.getHelicorder(scnl, t1, t2, gl);
-    } 
-    else {
+    } else {
       double startDiff = hd.getStartTime() - t1;
       if (startDiff > 1) {
         getData(scnl, t1, hd.getStartTime()); // get older stuff
         hd = cache.getHelicorder(scnl, t1, t2, gl);
       }
     }
-     
+
     return hd;
   }
 
@@ -216,12 +246,15 @@ public class SeedLinkSource extends SeismicDataSource {
    * @return the wave or null if none.
    */
   public Wave getWave(String scnl, double t1, double t2) {
-    LOGGER.trace("getWave: {} {} {}", scnl, J2kSec.toDateString(t1), J2kSec.toDateString(t2));
+    if (LOGGER.isTraceEnabled()) {
+      LOGGER.trace("SeedLinkSource getWave: {} {} {}", scnl, J2kSec.toDateString(t1),
+          J2kSec.toDateString(t2));
+    }
     scnl = scnl.replace(" ", "$"); // just to be sure
     startRealtimeClient(scnl);
 
     Wave wave = CachedDataSource.getInstance().getBestWave(scnl, t1, t2);
-    
+
     if (wave == null) {
       double now = J2kSec.now();
       t2 = Math.min(now, t2);
@@ -244,12 +277,20 @@ public class SeedLinkSource extends SeismicDataSource {
    * @param scnl channel
    */
   private void startRealtimeClient(String scnl) {
-    if(!realtimeClient.exists(scnl)) {
-      realtimeClient.add(scnl);
-      realtimeClient.start();
-    }
-    if(!realtimeClient.isRunning()) {
-      realtimeClient.start();
+    SeedLinkClient client = rtClients.get(scnl);
+    if (client == null) {
+      final double t1 = J2kSec.now() - 600.0;
+      final double t2 = Double.NaN;
+      client = new SeedLinkClient(host, port, t1, t2, scnl);
+      LOGGER.debug("SeedLinkSource startRealtimeClient: {}", client);
+      rtClients.put(scnl, client);
+      client.setDoneListener(rtClientsDoneListener);
+      client.updateLastRequestTime();
+      client.start();
+      // wait up to 10 seconds for some data to come back
+      client.waitForData(10000);
+    } else {
+      client.updateLastRequestTime();
     }
   }
 
@@ -262,29 +303,23 @@ public class SeedLinkSource extends SeismicDataSource {
    */
   private void getData(String scnl, double t1, double t2) {
     SeedLinkClient client = clients.get(scnl);
-
-    if (client == null) {
-      LOGGER.debug("getData: {} {} {}", scnl, J2kSec.toDateString(t1), J2kSec.toDateString(t2));
-      client = new SeedLinkClient(host, port, t1, t2, scnl);
-      clients.put(scnl, client);
-      client.start();
-    } else if (!client.isRunning()) {
-      LOGGER.debug("getData: {} {} {}", scnl, J2kSec.toDateString(t1), J2kSec.toDateString(t2));
+    if (client != null) {
+      client.updateLastRequestTime();
+      // wait up to 10 seconds for client to be done
+      client.waitForDone(10000);
       client.closeConnection();
+      client = null;
+    }
+    if (client == null) {
       client = new SeedLinkClient(host, port, t1, t2, scnl);
+      LOGGER.debug("SeedLinkSource getData: {}", client);
+      client.setDoneListener(clientsDoneListener);
       clients.put(scnl, client);
+      client.updateLastRequestTime();
       client.start();
-    } else {
-      client.setStartEndTimes(t1, t2);
+      // wait up to 10 seconds for client to get data
+      client.waitForDone(10000);
     }
-
-    // wait about 10 seconds for some data to come back
-    try {
-      Thread.sleep(10000);
-    } catch (InterruptedException e) {
-      //
-    }
-
   }
 
   /**
@@ -305,11 +340,19 @@ public class SeedLinkSource extends SeismicDataSource {
    */
   public synchronized void notifyDataNotNeeded(String station, double t1, double t2,
       GulperListener gl) {
-
-    // not sure if other viewers are using the station.
-    // any good way to check?
-    // will be added back later if other frames are using it but may lead to gaps in data?
-    realtimeClient.remove(station.replace(" ", "$"));
+    if (!CLOSE_WHEN_DATA_NOT_NEEDED) {
+      return;
+    }
+    // This is called on the EDT
+    // Other viewers may be using the station and there is no good way to check
+    // Could be removed and added back later if other frames are using it but may lead to gaps in
+    // data
+    station = station.replace(" ", "$");
+    SeedLinkClient client = rtClients.remove(station);
+    if (client != null) {
+      LOGGER.debug("SeedLinkSource notifyDataNotNeeded: {}", client);
+      client.closeConnection();
+    }
   }
 
   /**

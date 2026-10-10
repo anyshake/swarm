@@ -13,7 +13,6 @@ import gov.usgs.volcanoes.core.legacy.plot.render.TextRenderer;
 import gov.usgs.volcanoes.core.time.J2kSec;
 import gov.usgs.volcanoes.swarm.Icons;
 import gov.usgs.volcanoes.swarm.Metadata;
-import gov.usgs.volcanoes.swarm.Offscreen;
 import gov.usgs.volcanoes.swarm.SwarmConfig;
 import gov.usgs.volcanoes.swarm.SwingWorker;
 import gov.usgs.volcanoes.swarm.event.TagData;
@@ -43,9 +42,10 @@ import java.awt.event.MouseWheelListener;
 import java.awt.geom.GeneralPath;
 import java.awt.geom.Line2D;
 import java.awt.geom.Rectangle2D;
+import java.awt.image.BufferedImage;
+import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Date;
 import java.util.TimeZone;
 import javax.swing.JComponent;
@@ -93,7 +93,8 @@ public class HelicorderViewPanel extends JComponent implements SwarmOptionsListe
 
   private WaveViewPanel insetWavePanel;
 
-  private final transient Offscreen offscreen = new Offscreen();
+  private BufferedImage bufferImage;
+  private BufferedImage displayImage;
 
   private boolean working;
   private boolean resized;
@@ -472,6 +473,10 @@ public class HelicorderViewPanel extends JComponent implements SwarmOptionsListe
     return (int) Math.floor((my - translation[3]) / translation[2]);
   }
 
+  public int getNumRows() {
+    return heliRenderer.getNumRows();
+  }
+
   /**
    * Remove wave inset from panel.
    */
@@ -642,26 +647,37 @@ public class HelicorderViewPanel extends JComponent implements SwarmOptionsListe
    * Invalidate image.
    */
   public void invalidateImage() {
-    if (heliData == null) {
-      repaint();
-      return;
-    }
-    offscreen.render(this, new Offscreen.Painter() {
-      public void paint(Graphics2D graphics) {
-        drawHelicorder(graphics);
+    final SwingWorker worker = new SwingWorker() {
+      public Object construct() {
+        createImage();
+        return null;
       }
-    }, true);
+
+      public void finished() {
+        displayImage = bufferImage;
+        repaint();
+      }
+    };
+    worker.start();
   }
 
   protected void setResized(boolean b) {
     resized = b;
   }
 
-  private void drawHelicorder(Graphics2D ig) {
-    Dimension d = this.getSize();
-    if (d.width <= 0 || d.height <= 0 || heliData == null) {
+  private void createImage() {
+    if (heliData == null) {
       return;
     }
+
+    Dimension d = this.getSize();
+    if (d.width <= 0 || d.height <= 0) {
+      return;
+    }
+
+    bufferImage = new BufferedImage(d.width, d.height, BufferedImage.TYPE_4BYTE_ABGR);
+
+    Graphics2D ig = (Graphics2D) bufferImage.getGraphics();
     plot.setSize(d);
 
     double offset = 0;
@@ -739,69 +755,65 @@ public class HelicorderViewPanel extends JComponent implements SwarmOptionsListe
       axis.createTopTicks(null, mjt);
       axis.createVerticalGridLines(mjt);
 
-      // A label slot without text still becomes a renderer that draws nothing and restores the
-      // graphics state, so only the filled slots are passed on, in their original order.
       int bc = (settings.timeChunk / 5) + 2;
       String[] btl = new String[bc];
       double[] btlv = new double[bc];
       btl[0] = "+";
       btlv[0] = 30;
-      int j = 1;
-      for (int i = 0; i < mjt.length; i++) {
+      for (int i = 0, j = 1; i < mjt.length; i++) {
         long m = Math.round(mjt[i] / 60.0);
         if (m % 5 == 0) {
           btl[j] = Long.toString(m);
           btlv[j++] = mjt[i];
         }
       }
-      axis.createBottomTickLabels(Arrays.copyOf(btlv, j), Arrays.copyOf(btl, j));
+      axis.createBottomTickLabels(btlv, btl);
 
       HelicorderRenderer hr = (HelicorderRenderer) fr;
       int numRows = hr.getNumRows();
-      // Rows are visited bottom up, so each list fills from its end to keep rows ascending.
-      double[] leftLabelPos = new double[numRows];
+      double[] labelPosLr = new double[numRows];
       String[] leftLabelText = new String[numRows];
-      double[] rightLabelPos = new double[numRows];
       String[] rightLabelText = new String[numRows];
-      int left = numRows;
-      int right = numRows;
       TimeZone timeZone = swarmConfig.getTimeZone(settings.channel);
-      useRowFormats(timeZone);
+
+      DateFormat localTimeFormat = new SimpleDateFormat("HH:mm");
+      localTimeFormat.setTimeZone(timeZone);
+
+      DateFormat localDayFormat = new SimpleDateFormat("MM-dd");
+      localDayFormat.setTimeZone(timeZone);
 
       double pixelsPast = 0;
       double pixelsPerRow = fr.getGraphHeight() / numRows;
       String lastLocalDay = "";
       for (int i = numRows - 1; i >= 0; i--) {
         pixelsPast += pixelsPerRow;
+        labelPosLr[i] = i + 0.5;
 
-        Date dtz = J2kSec.asDate(hr.getHelicorderMaxX() - (i + 1) * settings.timeChunk);
+        String localTime = localTimeFormat
+            .format(J2kSec.asDate(hr.getHelicorderMaxX() - (i + 1) * settings.timeChunk));
+        leftLabelText[i] = null;
         if (pixelsPast > 20) {
-          left--;
-          leftLabelPos[left] = i + 0.5;
-          leftLabelText[left] = rowTimeFormat.format(dtz);
+          leftLabelText[i] = localTime;
           pixelsPast = 0;
         }
 
+        Date dtz = J2kSec.asDate(hr.getHelicorderMaxX() - (i + 1) * settings.timeChunk);
         String localDay =
-            rowDayFormat.format(new Date(dtz.getTime() + settings.timeChunk * 1000));
+            localDayFormat.format(new Date(dtz.getTime() + settings.timeChunk * 1000));
         if (!localDay.equals(lastLocalDay)) {
-          right--;
-          rightLabelPos[right] = i + 0.5;
-          rightLabelText[right] = localDay;
+          rightLabelText[i] = localDay;
           lastLocalDay = localDay;
         }
       }
 
-      axis.createLeftTickLabels(Arrays.copyOfRange(leftLabelPos, left, numRows),
-          Arrays.copyOfRange(leftLabelText, left, numRows));
-      axis.createRightTickLabels(Arrays.copyOfRange(rightLabelPos, right, numRows),
-          Arrays.copyOfRange(rightLabelText, right, numRows));
+      axis.createLeftTickLabels(labelPosLr, leftLabelText);
+      axis.createRightTickLabels(labelPosLr, rightLabelText);
 
       boolean dst = timeZone.inDaylightTime(J2kSec.asDate(hr.getViewEndTime()));
       String timeZoneName = timeZone.getDisplayName(dst, TimeZone.SHORT);
       TextRenderer tr =
           new TextRenderer(3, fr.getGraphY() + fr.getGraphHeight() + 14, timeZoneName);
-      tr.font = ROW_LABEL_FONT;
+      tr.font = Font.decode("dialog-PLAIN-9");
       tr.antiAlias = false;
       axis.addPostRenderer(tr);
 
@@ -825,27 +837,6 @@ public class HelicorderViewPanel extends JComponent implements SwarmOptionsListe
   }
 
   private static final Color DARK_GREEN = new Color(0, 168, 0);
-  private static final Color INSET_HIGHLIGHT = new Color(255, 255, 0, 128);
-  private static final Font ROW_LABEL_FONT = Font.decode("dialog-PLAIN-9");
-  private SimpleDateFormat rowTimeFormat;
-  private SimpleDateFormat rowDayFormat;
-  private TimeZone rowLabelZone;
-
-  private void useRowFormats(TimeZone timeZone) {
-    if (rowTimeFormat == null) {
-      rowTimeFormat = new SimpleDateFormat("HH:mm");
-      rowDayFormat = new SimpleDateFormat("MM-dd");
-    }
-    if (!timeZone.equals(rowLabelZone)) {
-      rowTimeFormat.setTimeZone(timeZone);
-      rowDayFormat.setTimeZone(timeZone);
-      rowLabelZone = timeZone;
-    }
-  }
-
-  private final GeneralPath markPath = new GeneralPath();
-  private final Line2D.Double markLine = new Line2D.Double();
-  private final Rectangle2D.Double highlightRect = new Rectangle2D.Double();
 
   private void drawMark(Graphics2D g2, double t, Color color) {
     if (Double.isNaN(t)) {
@@ -860,25 +851,24 @@ public class HelicorderViewPanel extends JComponent implements SwarmOptionsListe
         || x > heliRenderer.getGraphX() + heliRenderer.getGraphWidth() - 1
         || y > heliRenderer.getGraphY() + heliRenderer.getGraphHeight() - 1)) {
       g2.setColor(color);
-      markLine.setLine(x, y, x, y + translation[2]);
-      g2.draw(markLine);
+      g2.draw(new Line2D.Double(x, y, x, y + translation[2]));
 
-      markPath.reset();
-      markPath.moveTo(x, y);
-      markPath.lineTo(x - 4f, y - 6f);
-      markPath.lineTo(x + 4f, y - 6f);
-      markPath.closePath();
-      g2.fill(markPath);
-      g2.draw(markPath);
+      GeneralPath gp = new GeneralPath();
+      gp.moveTo(x, y);
+      gp.lineTo((float) x - 4, (float) y - 6);
+      gp.lineTo((float) x + 4, (float) y - 6);
+      gp.closePath();
+      g2.fill(gp);
+      g2.draw(gp);
 
-      float base = (float) (y + translation[2]);
-      markPath.reset();
-      markPath.moveTo(x, base);
-      markPath.lineTo(x - 4f, base + 6f);
-      markPath.lineTo(x + 4f, base + 6f);
-      markPath.closePath();
-      g2.fill(markPath);
-      g2.draw(markPath);
+      gp.reset();
+      gp.moveTo(x, (float) (y + translation[2]));
+      gp.lineTo((float) x - 4, (float) (y + 6 + translation[2]));
+      gp.lineTo((float) x + 4, (float) (y + 6 + translation[2]));
+      gp.closePath();
+      gp.closePath();
+      g2.fill(gp);
+      g2.draw(gp);
     }
   }
 
@@ -917,8 +907,8 @@ public class HelicorderViewPanel extends JComponent implements SwarmOptionsListe
       if (!parent.isWorking()) {
         parent.setStatus("The server returned no helicorder data.");
       }
-    } else if (offscreen.displayed() != null) {
-      g2.drawImage(offscreen.displayed(), 0, 0, null);
+    } else if (displayImage != null) {
+      g2.drawImage(displayImage, 0, 0, null);
     }
 
     drawMark(g2, startMark, DARK_GREEN);
@@ -980,8 +970,8 @@ public class HelicorderViewPanel extends JComponent implements SwarmOptionsListe
 
       // finally, draw the highlight.
       Paint pnt = g2.getPaint();
-      g2.setPaint(INSET_HIGHLIGHT);
-      Rectangle2D.Double rect = highlightRect;
+      g2.setPaint(new Color(255, 255, 0, 128));
+      Rectangle2D.Double rect = new Rectangle2D.Double();
 
       int zoomTimeSpan = parent.getHelicorderViewerSettings().waveZoomOffset * 2;
       double zoomPixelSpan = 1.0 / translation[PIXEL_TIME_SPAN] * zoomTimeSpan;

@@ -97,6 +97,16 @@ public class HelicorderViewerFrame extends SwarmFrame implements Kioskable {
   public static final int[] zoomValues = new int[] { 1, 2, 5, 10, 20, 30, MINUTE, 2 * MINUTE,
       5 * MINUTE, 10 * MINUTE, 20 * MINUTE, 40 * MINUTE, 1 * HOUR, 90 * MINUTE };
 
+  private static final void initSettings(final SeismicDataSource sds, final HelicorderViewerSettings settings) {
+    if (!sds.allowRealtime()) {
+      final double bt = settings.getBottomTime();
+      final double now = J2kSec.now();
+      if (Double.isNaN(bt) || bt > now) {
+        settings.setBottomTime(now);
+      }
+    }
+  }
+
   private final RefreshThread refreshThread;
   private final SeismicDataSource dataSource;
   private JPanel mainPanel;
@@ -159,7 +169,10 @@ public class HelicorderViewerFrame extends SwarmFrame implements Kioskable {
     dataSource = swarmConfig.getSource(cf.getString("source"));
     setTitle(channel + ", [" + dataSource + "]");
     settings = new HelicorderViewerSettings(channel);
-    settings.set(cf);
+    if (cf != null) {
+      settings.set(cf);
+    }
+    initSettings(dataSource, settings);
     waveViewSettings = new WaveViewSettings();
     waveViewSettings.set(cf.getSubConfig("wave"));
 
@@ -184,6 +197,7 @@ public class HelicorderViewerFrame extends SwarmFrame implements Kioskable {
     UiTime.touchTime();
     settings = new HelicorderViewerSettings(ch);
     settings.setBottomTime(bt);
+    initSettings(sds, settings);
     waveViewSettings = new WaveViewSettings();
     dataSource = sds;
 
@@ -443,7 +457,7 @@ public class HelicorderViewerFrame extends SwarmFrame implements Kioskable {
           public void actionPerformed(final ActionEvent e) {
             scaleClipState = !scaleClipState;
             if (scaleClipState) {
-              autoScaleSlider.setValue(40 - (int) (settings.barMult * 4));
+              autoScaleSlider.setValue(40 - (new Double(settings.barMult * 4).intValue()));
               scaleButton.setIcon(Icons.waveclip);
               autoScaleSlider.setToolTipText("Adjust helicorder clip");
             } else {
@@ -471,7 +485,7 @@ public class HelicorderViewerFrame extends SwarmFrame implements Kioskable {
           if (scaleClipState) {
             settings.clipBars = autoScaleSlider.getValue() * 3;
           } else {
-            settings.barMult = 10 - autoScaleSlider.getValue() / 4.0;
+            settings.barMult = 10 - (new Integer(autoScaleSlider.getValue()).doubleValue() / 4);
           }
           repaintHelicorder();
         }
@@ -773,7 +787,14 @@ public class HelicorderViewerFrame extends SwarmFrame implements Kioskable {
       bt = J2kSec.now();
     }
 
-    settings.setBottomTime(bt + units * settings.scrollSize * settings.timeChunk);
+    int n = settings.scrollSize;
+    if (n <= 0) {
+      n = helicorderViewPanel.getNumRows();
+      if (n <= 0 || n > HelicorderViewerSettings.MAX_AUTO_SCROLL_SIZE) {
+        n = HelicorderViewerSettings.MAX_AUTO_SCROLL_SIZE;
+      }
+    }
+    settings.setBottomTime(bt + units * n * settings.timeChunk);
     getHelicorder();
   }
 
@@ -858,25 +879,6 @@ public class HelicorderViewerFrame extends SwarmFrame implements Kioskable {
     return dataSource;
   }
 
-  // Old naps were min(elapsed, interval) until the gap was strictly past the interval.
-  // 2*interval-elapsed sleeps past that. A backward clock sleeps one interval instead of spinning.
-  private static long refreshSleepMs(final long elapsed, final long intervalMs) {
-    if (elapsed < 0 || elapsed > intervalMs) {
-      return intervalMs;
-    }
-    long total = 0;
-    long cursor = elapsed;
-    while (cursor <= intervalMs) {
-      final long nap = Math.min(cursor, intervalMs);
-      if (nap <= 0) {
-        return total;
-      }
-      total += nap;
-      cursor += nap;
-    }
-    return total;
-  }
-
   private class RefreshThread extends Thread {
     private boolean kill = false;
 
@@ -917,22 +919,21 @@ public class HelicorderViewerFrame extends SwarmFrame implements Kioskable {
         }
 
         try {
-          final long sleepMs;
-          if (refreshInterval <= 0) {
-            sleepMs = 30_000L;
+          final long now = System.currentTimeMillis();
+          final long sleepTime = Math.min(now - lastRefreshTime, refreshInterval * 1000);
+
+          if (refreshInterval > 0) {
+            Thread.sleep(sleepTime);
           } else {
-            final long elapsed = System.currentTimeMillis() - lastRefreshTime;
-            sleepMs = refreshSleepMs(elapsed, refreshInterval * 1000L);
+            Thread.sleep(30 * 1000);
           }
-          Thread.sleep(sleepMs);
         } catch (final Exception e) {
           //
         }
 
         final long now = System.currentTimeMillis();
 
-        if (!kill && refreshInterval > 0
-            && (now - lastRefreshTime) > refreshInterval * 1000L) {
+        if (!kill && refreshInterval > 0 && (now - lastRefreshTime) > refreshInterval * 1000) {
           try {
             final double bt = settings.getBottomTime();
             if (dataSource.isActiveSource() && Double.isNaN(bt)) {
@@ -1033,36 +1034,32 @@ public class HelicorderViewerFrame extends SwarmFrame implements Kioskable {
           final BufferedImage image =
               new BufferedImage(width, height, BufferedImage.TYPE_4BYTE_ABGR);
           final Graphics g = image.getGraphics();
-          try {
-            helicorderViewPanel.paint(g);
-            // draw label
-            if (includeChannel.isSelected()) {
-              Font oldFont = g.getFont();
-              g.setFont(Font.decode("Dialog-BOLD-40"));
-              String channel = settings.channel.replace('_', ' ');
+          helicorderViewPanel.paint(g);
+          // draw label
+          if (includeChannel.isSelected()) {
+            Font oldFont = g.getFont();
+            g.setFont(Font.decode("Dialog-BOLD-40"));
+            String channel = settings.channel.replace('_', ' ');
 
-              FontMetrics fm = g.getFontMetrics();
-              Font font = g.getFont();
-              float s = font.getSize();
-              int swidth = fm.stringWidth(channel);
-              while ((swidth / (double) width > .5) && (--s > 1)) {
-                g.setFont(font.deriveFont(s));
-                fm = g.getFontMetrics();
-                swidth = fm.stringWidth(channel);
-              }
-              height = fm.getAscent() + fm.getDescent();
-              int lw = swidth + 20;
-              g.setColor(new Color(255, 255, 255, 192));
-              g.fillRect(helicorderViewPanel.getX() + width / 2 - lw / 2, 3, lw, height);
-              g.setColor(Color.black);
-              g.drawRect(helicorderViewPanel.getX() + width / 2 - lw / 2, 3, lw, height);
-
-              g.drawString(channel, helicorderViewPanel.getX() + width / 2 - swidth / 2,
-                  height - fm.getDescent());
-              g.setFont(oldFont);
+            FontMetrics fm = g.getFontMetrics();
+            Font font = g.getFont();
+            float s = font.getSize();
+            int swidth = fm.stringWidth(channel);
+            while ((swidth / (double) width > .5) && (--s > 1)) {
+              g.setFont(font.deriveFont(s));
+              fm = g.getFontMetrics();
+              swidth = fm.stringWidth(channel);
             }
-          } finally {
-            g.dispose();
+            height = fm.getAscent() + fm.getDescent();
+            int lw = swidth + 20;
+            g.setColor(new Color(255, 255, 255, 192));
+            g.fillRect(helicorderViewPanel.getX() + width / 2 - lw / 2, 3, lw, height);
+            g.setColor(Color.black);
+            g.drawRect(helicorderViewPanel.getX() + width / 2 - lw / 2, 3, lw, height);
+
+            g.drawString(channel, helicorderViewPanel.getX() + width / 2 - swidth / 2,
+                height - fm.getDescent());
+            g.setFont(oldFont);
           }
           try {
             final PngEncoderB png = new PngEncoderB(image, false, PngEncoder.FILTER_NONE, 7);

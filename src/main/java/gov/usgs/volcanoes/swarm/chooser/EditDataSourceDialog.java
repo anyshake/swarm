@@ -3,6 +3,7 @@ package gov.usgs.volcanoes.swarm.chooser;
 import gov.usgs.volcanoes.swarm.Swarm;
 import gov.usgs.volcanoes.swarm.SwarmConfig;
 import gov.usgs.volcanoes.swarm.SwarmModalDialog;
+import gov.usgs.volcanoes.swarm.file.LocalFilePanel;
 import java.awt.BorderLayout;
 import java.awt.Insets;
 import java.util.ArrayList;
@@ -64,6 +65,7 @@ public class EditDataSourceDialog extends SwarmModalDialog {
     // panels.add(new DHIPanel());
     panels.add(new WebServicesPanel());
     panels.add(new SeedLinkPanel());
+    panels.add(new LocalFilePanel(this));
   }
 
   protected void createDataSourceUi() {
@@ -133,7 +135,7 @@ public class EditDataSourceDialog extends SwarmModalDialog {
     }
 
     if (message != null) {
-      JOptionPane.showMessageDialog(applicationFrame, message, "Error", JOptionPane.ERROR_MESSAGE);
+      JOptionPane.showMessageDialog(this, message, "Error", JOptionPane.ERROR_MESSAGE);
       return false;
     }
 

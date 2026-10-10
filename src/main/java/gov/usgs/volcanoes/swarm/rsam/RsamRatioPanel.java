@@ -9,7 +9,7 @@ import gov.usgs.volcanoes.core.legacy.plot.render.AxisRenderer;
 import gov.usgs.volcanoes.core.legacy.plot.render.HistogramRenderer;
 import gov.usgs.volcanoes.core.legacy.plot.render.MatrixRenderer;
 import gov.usgs.volcanoes.core.legacy.plot.render.ShapeRenderer;
-import gov.usgs.volcanoes.swarm.Offscreen;
+import gov.usgs.volcanoes.swarm.SwingWorker;
 import gov.usgs.volcanoes.swarm.time.UiTime;
 import java.awt.BasicStroke;
 import java.awt.Color;
@@ -36,7 +36,6 @@ public class RsamRatioPanel extends JComponent implements SettingsListener {
   public static final long serialVersionUID = -1;
 
   private static final Color BACKGROUND_COLOR = new Color(0xf7, 0xf7, 0xf7);
-  private static final BasicStroke TREND = new BasicStroke(2.0f);
 
   /**
    * X pixel location of where the main plot axis should be located on the component.
@@ -71,12 +70,7 @@ public class RsamRatioPanel extends JComponent implements SettingsListener {
    * The wave is rendered to an image that is only updated when the settings change for repaint
    * efficiency.
    */
-  private final transient Offscreen offscreen = new Offscreen();
-  private Plot plot;
-  private RSAMData countedData;
-  private int countedThreshold = Integer.MIN_VALUE;
-  private double countedRatio = Double.NaN;
-  private double countedMaxLength = Double.NaN;
+  private BufferedImage image;
 
   /**
    * Constructs a WaveViewPanel with default settings.
@@ -151,20 +145,42 @@ public class RsamRatioPanel extends JComponent implements SettingsListener {
     processSettings();
   }
 
-  /**
-   * Reads the last published frame without the plot lock, so a repaint does not stall while the
-   * next frame is built.
-   */
-  private BufferedImage getImage() {
-    return offscreen.displayed();
+  private synchronized void setImage(BufferedImage bi) {
+    image = bi;
+  }
+
+  private synchronized BufferedImage getImage() {
+    return image;
   }
 
   private void createImage() {
-    offscreen.render(this, new Offscreen.Painter() {
-      public void paint(Graphics2D graphics) {
-        constructPlot(graphics);
+    final Runnable r = new Runnable() {
+      public void run() {
+        if (getWidth() > 0 && getHeight() > 0) {
+          BufferedImage bi =
+              new BufferedImage(getWidth(), getHeight(), BufferedImage.TYPE_4BYTE_ABGR);
+          Graphics2D ig = (Graphics2D) bi.getGraphics();
+          constructPlot(ig);
+          setImage(bi);
+        }
       }
-    }, true);
+    };
+
+    if (SwingUtilities.isEventDispatchThread()) {
+      SwingWorker worker = new SwingWorker() {
+        public Object construct() {
+          r.run();
+          return null;
+        }
+
+        public void finished() {
+          repaint();
+        }
+      };
+      worker.start();
+    } else {
+      r.run();
+    }
   }
 
   /**
@@ -224,11 +240,7 @@ public class RsamRatioPanel extends JComponent implements SettingsListener {
   private synchronized void constructPlot(Graphics2D g2) {
     Dimension dim = this.getSize();
 
-    if (plot == null) {
-      plot = new Plot();
-    } else {
-      plot.clear();
-    }
+    Plot plot = new Plot();
     plot.setBackgroundColor(BACKGROUND_COLOR);
     plot.setSize(dim);
 
@@ -284,9 +296,8 @@ public class RsamRatioPanel extends JComponent implements SettingsListener {
     double max;
     double min;
     if (settings.autoScale) {
-      double peak = gdm.max(1);
-      max = peak + peak * .1;
-      min = gdm.min(1) - peak * .1;
+      max = gdm.max(1) + gdm.max(1) * .1;
+      min = gdm.min(1) - gdm.max(1) * .1;
     } else {
       max = settings.scaleMax;
       min = settings.scaleMin;
@@ -310,23 +321,6 @@ public class RsamRatioPanel extends JComponent implements SettingsListener {
   }
 
   /**
-   * Count events once per data object and detection settings. countEvents replaces its histogram.
-   */
-  private void countEvents(RSAMData data) {
-    if (data == countedData && settings.eventThreshold == countedThreshold
-        && Double.doubleToLongBits(settings.eventRatio) == Double.doubleToLongBits(countedRatio)
-        && Double.doubleToLongBits(settings.eventMaxLengthS) == Double
-            .doubleToLongBits(countedMaxLength)) {
-      return;
-    }
-    data.countEvents(settings.eventThreshold, settings.eventRatio, settings.eventMaxLengthS);
-    countedData = data;
-    countedThreshold = settings.eventThreshold;
-    countedRatio = settings.eventRatio;
-    countedMaxLength = settings.eventMaxLengthS;
-  }
-
-  /**
    * Plots RSAM counts.
    * 
    * @param data the RSAM values to plot
@@ -337,7 +331,7 @@ public class RsamRatioPanel extends JComponent implements SettingsListener {
     }
 
     // get the relevant information for this channel
-    countEvents(data);
+    data.countEvents(settings.eventThreshold, settings.eventRatio, settings.eventMaxLengthS);
 
     // setup the histogram renderer with this data
     HistogramRenderer hr = new HistogramRenderer(data.getCountsHistogram(settings.binSize));
@@ -367,7 +361,7 @@ public class RsamRatioPanel extends JComponent implements SettingsListener {
       mr.createDefaultLineRenderers(Color.RED);
       ShapeRenderer[] r = mr.getLineRenderers();
       ((ShapeRenderer) r[0]).color = Color.RED;
-      ((ShapeRenderer) r[0]).stroke = TREND;
+      ((ShapeRenderer) r[0]).stroke = new BasicStroke(2.0f);
 
       // create the axis for the right hand side
       AxisRenderer ar = new AxisRenderer(mr);
