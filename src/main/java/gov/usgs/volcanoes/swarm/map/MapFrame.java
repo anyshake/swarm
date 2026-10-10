@@ -68,6 +68,8 @@ public class MapFrame extends SwarmFrame implements Runnable, Kioskable, SwarmOp
   private JButton optionsButton;
   private JButton labelButton;
   private JLabel statusLabel;
+  private String pendingStatusText;
+  private boolean statusUpdateQueued;
   private JToggleButton linkButton;
   private JToggleButton realtimeButton;
   private JButton compXButton;
@@ -572,13 +574,28 @@ public class MapFrame extends SwarmFrame implements Runnable, Kioskable, SwarmOp
    * @param t text
    */
   public void setStatusText(final String t) {
-    final String next = composeStatus(t);
-    if (next != null && next.equals(statusLabel.getText())) {
+    if (!SwingUtilities.isEventDispatchThread()) {
+      SwingUtilities.invokeLater(new Runnable() {
+        public void run() {
+          setStatusText(t);
+        }
+      });
       return;
     }
+    final String next = composeStatus(t);
+    final String shown = statusUpdateQueued ? pendingStatusText : statusLabel.getText();
+    if (next == null ? shown == null : next.equals(shown)) {
+      return;
+    }
+    pendingStatusText = next;
+    if (statusUpdateQueued) {
+      return;
+    }
+    statusUpdateQueued = true;
     SwingUtilities.invokeLater(new Runnable() {
       public void run() {
-        statusLabel.setText(composeStatus(t));
+        statusUpdateQueued = false;
+        statusLabel.setText(pendingStatusText);
         statusLabel.repaint();
       }
     });
