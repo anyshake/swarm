@@ -173,6 +173,7 @@ public class MapPanel extends JPanel {
   private static final Integer MAP_LAYER = Integer.valueOf(10);
   private static final Integer ICON_LAYER = Integer.valueOf(15);
   private static final Integer PANEL_LAYER = Integer.valueOf(20);
+  private static final Font PROJECTION_FONT = new Font("Arial", Font.PLAIN, 10);
 
   private List<Line2D.Double> lines;
 
@@ -210,6 +211,11 @@ public class MapPanel extends JPanel {
   private final Stack<double[]> timeHistory;
 
   private int missing;
+  private final Rectangle labelProbe = new Rectangle();
+  private final Point labelPoint = new Point();
+  private final Point2D.Double layoutLonLat = new Point2D.Double();
+  private final FontRenderContext labelFrc =
+      new FontRenderContext(new AffineTransform(), false, false);
 
   private final Set<MapMiniPanel> selectedPanels;
   // private final boolean allowMultiSelection = false;
@@ -761,22 +767,69 @@ public class MapPanel extends JPanel {
     range = projection.getGeoRange(center, xm, ym);
   }
 
+  private static int labelX(final int index, final int x, final int w) {
+    switch (index) {
+      case 0:
+      case 1:
+      case 2:
+      case 6:
+      case 7:
+        return x + 5;
+      case 3:
+      case 4:
+      case 5:
+      case 12:
+      case 13:
+        return x - w - 5;
+      case 15:
+        return x + 40;
+      case 16:
+        return x - w - 40;
+      default:
+        return x;
+    }
+  }
+
+  private static int labelY(final int index, final int y) {
+    switch (index) {
+      case 0:
+      case 3:
+        return y - 5;
+      case 2:
+      case 5:
+        return y - 10;
+      case 6:
+      case 8:
+      case 12:
+      case 16:
+        return y - 15;
+      case 7:
+      case 9:
+      case 13:
+        return y + 5;
+      case 10:
+      case 14:
+        return y - 20;
+      case 11:
+      case 15:
+        return y + 10;
+      default:
+        return y;
+    }
+  }
+
   private Point getLabelPosition(final GeneralPath boxes, final int x, final int y, final int w,
       final int h) {
-    final int[] dxy = new int[] { x + 5, y - 5, x + 5, y, x + 5, y - 10, x - w - 5, y - 5,
-        x - w - 5, y, x - w - 5, y - 10, x + 5, y - 15, x + 5, y + 5, x, y - 15, x, y + 5, x,
-        y - 20, x, y + 10, x - w - 5, y - 15, x - w - 5, y + 5, x, y - 20, x + 40, y + 10,
-        x - w - 40, y - 15, };
-
-    for (int i = 0; i < dxy.length / 2; i++) {
-      final int px = dxy[i * 2];
-      final int py = dxy[i * 2 + 1];
+    for (int i = 0; i < 17; i++) {
+      final int px = labelX(i, x, w);
+      final int py = labelY(i, y);
       if (px < 0 || py < 0) {
         continue;
       }
-      final Rectangle rect = new Rectangle(px, py, w, h);
-      if (!boxes.intersects(rect)) {
-        return new Point(px, py);
+      labelProbe.setBounds(px, py, w, h);
+      if (!boxes.intersects(labelProbe)) {
+        labelPoint.setLocation(px, py);
+        return labelPoint;
       }
     }
 
@@ -867,7 +920,7 @@ public class MapPanel extends JPanel {
       final TextRenderer tr = new TextRenderer(mapImagePanel.getWidth() - INSET, 14,
           projection.getName() + " Projection");
       tr.antiAlias = false;
-      tr.font = new Font("Arial", Font.PLAIN, 10);
+      tr.font = PROJECTION_FONT;
       tr.horizJustification = TextRenderer.RIGHT;
       mr.addRenderer(tr);
       renderer = mr;
@@ -897,8 +950,6 @@ public class MapPanel extends JPanel {
     final List<JComponent> compsToAdd = new ArrayList<JComponent>();
     final List<Line2D.Double> linesToAdd = new ArrayList<Line2D.Double>();
 
-    final FontRenderContext frc = new FontRenderContext(new AffineTransform(), false, false);
-
     final GeneralPath boxes = new GeneralPath();
     missing = 0;
 
@@ -915,7 +966,8 @@ public class MapPanel extends JPanel {
         }
       }
       for (final Metadata md : allMetadata.values()) {
-        if (!range.contains(new Point2D.Double(md.getLongitude(), md.getLatitude()))) {
+        layoutLonLat.setLocation(md.getLongitude(), md.getLatitude());
+        if (!range.contains(layoutLonLat)) {
           final MapMiniPanel mmp = miniPanels.get(md.getLocationHashCode());
           if (mmp != null) {
             miniPanels.remove(md.getLocationHashCode());
@@ -950,8 +1002,8 @@ public class MapPanel extends JPanel {
               }
             }
 
-            final int w = (int) Math
-                .round(MapMiniPanel.FONT.getStringBounds(md.getScnl().station + 6, frc).getWidth());
+            final int w = (int) Math.round(
+                MapMiniPanel.FONT.getStringBounds(md.getScnl().station + 6, labelFrc).getWidth());
             int locX = (int) xy.x;
             int locY = (int) xy.y;
             Point pt = null;
@@ -961,19 +1013,22 @@ public class MapPanel extends JPanel {
               locX = (int) xy2.x;
               locY = (int) xy2.y;
               cmp.setPosition(Position.MANUAL_SET);
-              pt = new Point(locX, locY);
+              labelPoint.setLocation(locX, locY);
+              pt = labelPoint;
             } else {
               pt = getLabelPosition(boxes, locX, locY, w, 13);
             }
 
             if (pt == null && labelSetting == LabelSetting.ALL) {
-              pt = new Point(locX, locY);
+              labelPoint.setLocation(locX, locY);
+              pt = labelPoint;
             }
 
             if (pt != null) {
               locX = pt.x;
               locY = pt.y;
-              boxes.append(new Rectangle(locX, locY, w, 13), false);
+              labelProbe.setBounds(locX, locY, w, 13);
+              boxes.append(labelProbe, false);
               cmp.setLocation(locX, locY);
               if (cmp.getPosition() == Position.UNSET) {
                 cmp.setPosition(Position.AUTOMATIC);
