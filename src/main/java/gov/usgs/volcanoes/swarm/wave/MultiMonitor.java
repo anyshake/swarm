@@ -512,6 +512,13 @@ public class MultiMonitor extends SwarmFrame implements Kioskable {
       }
 
       @Override
+      public void internalFrameDeiconified(final InternalFrameEvent e) {
+        if (panels.size() > 0) {
+          slide();
+        }
+      }
+
+      @Override
       public void internalFrameClosing(final InternalFrameEvent e) {
         throbber.close();
         selectedIndex = -1;
@@ -924,7 +931,8 @@ public class MultiMonitor extends SwarmFrame implements Kioskable {
   private class SlideTask extends TimerTask {
     @Override
     public void run() {
-      if (panels.size() > 0) {
+      // an iconified monitor shows no waves; it catches up when it is restored
+      if (panels.size() > 0 && !isIcon()) {
         slide();
       }
     }
