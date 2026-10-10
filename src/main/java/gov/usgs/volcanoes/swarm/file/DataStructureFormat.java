@@ -17,7 +17,9 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.TimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -468,7 +470,9 @@ public class DataStructureFormat implements Cloneable, DataStructureConst, Swarm
    */
   public String findChannels(List<String> channels, SeismicDataSource source, Date minDate,
       Date maxDate) {
-    String error = findChannelsNow(channels, source, baseDir, getFilter(), minDate, maxDate);
+    Set<String> knownChannels = channels == null ? null : new HashSet<String>(channels);
+    String error =
+        findChannelsNow(channels, knownChannels, source, baseDir, getFilter(), minDate, maxDate);
     if (channels != null && !channels.isEmpty()) {
       Collections.sort(channels);
     }
@@ -486,8 +490,9 @@ public class DataStructureFormat implements Cloneable, DataStructureConst, Swarm
    * @param maxDate the start date or null if none.
    * @return an empty string if success, an error message otherwise.
    */
-  private String findChannelsNow(List<String> channels, SeismicDataSource source, Path dir,
-      DirectoryStream.Filter<Path> filter, Date minDate, Date maxDate) {
+  private String findChannelsNow(List<String> channels, Set<String> knownChannels,
+      SeismicDataSource source, Path dir, DirectoryStream.Filter<Path> filter, Date minDate,
+      Date maxDate) {
     String error = EMPTY_STRING;
     try (DirectoryStream<Path> ds = Files.newDirectoryStream(dir, filter)) {
       for (Path p : ds) {
@@ -497,12 +502,13 @@ public class DataStructureFormat implements Cloneable, DataStructureConst, Swarm
         }
         // if directory
         if (channel.isEmpty()) {
-          findChannelsNow(channels, source, p, filter, minDate, maxDate);
-        } else if (channels != null && !channels.contains(channel)) {
+          findChannelsNow(channels, knownChannels, source, p, filter, minDate, maxDate);
+        } else if (channels != null && !knownChannels.contains(channel)) {
           if (source == null) {
             channels.add(channel);
+            knownChannels.add(channel);
           } else {
-            ChannelUtil.addChannel(channels,
+            ChannelUtil.addChannel(channels, knownChannels,
                 new ChannelGroupInfo(channel, GroupsType.NETWORK_AND_SITE), source);
           }
         }
