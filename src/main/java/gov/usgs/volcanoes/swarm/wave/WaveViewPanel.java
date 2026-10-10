@@ -415,6 +415,7 @@ public class WaveViewPanel extends JComponent {
       }
 
       public void mouseExited(MouseEvent e) {
+        time = Double.NaN;
         WaveViewTime.fireTimeChanged(Double.NaN);
         pauseCursorMark = false;
         dragging = false;
