@@ -7,6 +7,7 @@ import gov.usgs.volcanoes.core.legacy.plot.map.GeoLabelSet;
 import gov.usgs.volcanoes.core.legacy.plot.map.MapRenderer;
 import gov.usgs.volcanoes.core.legacy.plot.map.WMSGeoImageSet;
 import gov.usgs.volcanoes.core.legacy.plot.render.TextRenderer;
+import gov.usgs.volcanoes.core.math.proj.Ellipsoid;
 import gov.usgs.volcanoes.core.math.proj.GeoRange;
 import gov.usgs.volcanoes.core.math.proj.Mercator;
 import gov.usgs.volcanoes.core.math.proj.Projection;
@@ -1101,7 +1102,52 @@ public class MapPanel extends JPanel {
     private static final long serialVersionUID = 1L;
 
     private static final long RULER_BREAK_SQ = 100L * 100L;
+    private static final double DEG_TO_RAD = 0.017453292519943295d;
+    private static final double RAD_TO_DEG = 57.29577951308232d;
     private final Font labelFont = Font.decode("dialog-plain-12");
+    private final Point2D.Double routeStep = new Point2D.Double();
+    private Point2D.Double[] circleScratch;
+
+    /**
+     * Same spherical step as {@link Projection#getPointFrom}, written into {@code out}.
+     */
+    private void pointFrom(final Point2D.Double origin, final double distanceM,
+        final double azimuthDeg, final Point2D.Double out) {
+      final double lat = origin.y * DEG_TO_RAD;
+      final double lon = origin.x * DEG_TO_RAD;
+      final double delta = distanceM / Ellipsoid.ELLIPSOIDS[0].equatorialRadius;
+      final double azimuth = azimuthDeg * DEG_TO_RAD;
+      out.y = Math.asin(Math.sin(lat) * Math.cos(delta)
+          + Math.cos(lat) * Math.sin(delta) * Math.cos(azimuth)) * RAD_TO_DEG;
+      out.x = (lon + Math.atan2(Math.sin(delta) * Math.sin(azimuth),
+          Math.cos(lat) * Math.cos(delta) - Math.sin(lat) * Math.sin(delta) * Math.cos(azimuth)))
+          * RAD_TO_DEG;
+    }
+
+    private Point2D.Double[] circlePoints(final Point2D.Double origin, final double distanceM,
+        final int count) {
+      if (circleScratch == null || circleScratch.length != count) {
+        circleScratch = new Point2D.Double[count];
+        for (int i = 0; i < count; i++) {
+          circleScratch[i] = new Point2D.Double();
+        }
+      }
+      final double lat = origin.y * DEG_TO_RAD;
+      final double lon = origin.x * DEG_TO_RAD;
+      final double delta = distanceM / Ellipsoid.ELLIPSOIDS[0].equatorialRadius;
+      final double sinLat = Math.sin(lat);
+      final double cosLat = Math.cos(lat);
+      final double sinDelta = Math.sin(delta);
+      final double cosDelta = Math.cos(delta);
+      for (int i = 0; i < count; i++) {
+        final double azimuth = ((double) i / (double) count) * 360.0d * DEG_TO_RAD;
+        final Point2D.Double point = circleScratch[i];
+        point.y = Math.asin(sinLat * cosDelta + cosLat * sinDelta * Math.cos(azimuth)) * RAD_TO_DEG;
+        point.x = (lon + Math.atan2(Math.sin(delta) * Math.sin(azimuth),
+            cosLat * cosDelta - sinLat * sinDelta * Math.cos(azimuth))) * RAD_TO_DEG;
+      }
+      return circleScratch;
+    }
 
     private boolean rulerBreaks(final int x0, final int y0, final int x1, final int y1) {
       final int dx = x1 - x0;
@@ -1136,7 +1182,7 @@ public class MapPanel extends JPanel {
       final Point2D.Double origin = getLonLat(mouseDown.x, mouseDown.y);
       final double d = Projection.distanceBetweenM(origin, lonLat);
       final int n = 720;
-      final Point2D.Double[] pts = Projection.getPointsFrom(origin, d, n);
+      final Point2D.Double[] pts = circlePoints(origin, d, n);
       final GeneralPath gp = rulerPath;
       gp.reset();
       Point2D.Double xy = getXy(pts[0].x, pts[0].y);
@@ -1171,9 +1217,9 @@ public class MapPanel extends JPanel {
       double d = Projection.distanceBetweenM(origin, lonLat);
       while (d > 20 * 1000) {
         final double az = Projection.azimuthTo(origin, lonLat);
-        final Point2D.Double p0 = Projection.getPointFrom(origin, 20 * 1000, az);
+        pointFrom(origin, 20 * 1000, az, routeStep);
 
-        xy = getXy(p0.x, p0.y);
+        xy = getXy(routeStep.x, routeStep.y);
         int thisX = (int) Math.round(xy.x);
         int thisY = (int) Math.round(xy.y);
         if (rulerBreaks(lastX, lastY, thisX, thisY)) {
@@ -1184,7 +1230,7 @@ public class MapPanel extends JPanel {
         lastX = thisX;
         lastY = thisY;
 
-        origin = p0;
+        origin.setLocation(routeStep);
         d = Projection.distanceBetweenM(origin, lonLat);
       }
       g2.setColor(Color.GREEN);
