@@ -17,6 +17,7 @@ import java.util.Map;
 import javax.swing.JFrame;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import cern.colt.matrix.DoubleFactory2D;
 import cern.colt.matrix.DoubleMatrix2D;
 
 /**
