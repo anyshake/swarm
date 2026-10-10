@@ -1079,6 +1079,14 @@ public class MapPanel extends JPanel {
 
     private static final long RULER_BREAK_SQ = 100L * 100L;
     private final Font labelFont = Font.decode("dialog-plain-12");
+
+    private boolean rulerBreaks(final int x0, final int y0, final int x1, final int y1) {
+      final int dx = x1 - x0;
+      final int dy = y1 - y0;
+      final long squared = (long) dx * dx + (long) dy * dy;
+      return squared < 0 || squared > RULER_BREAK_SQ;
+    }
+
     private BasicStroke mapLineStroke;
     private Color mapLinePaint;
     private int cachedLineWidth = Integer.MIN_VALUE;
@@ -1116,9 +1124,7 @@ public class MapPanel extends JPanel {
         xy = getXy(pts[i % n].x, pts[i % n].y);
         int thisX = (int) Math.round(xy.x);
         int thisY = (int) Math.round(xy.y);
-        long dx = (long) thisX - lastX;
-        long dy = (long) thisY - lastY;
-        if (dx * dx + dy * dy > RULER_BREAK_SQ) {
+        if (rulerBreaks(lastX, lastY, thisX, thisY)) {
           gp.moveTo(thisX - 2, thisY - 1);
         } else {
           gp.lineTo(thisX - 2, thisY - 1);
@@ -1147,9 +1153,7 @@ public class MapPanel extends JPanel {
         xy = getXy(p0.x, p0.y);
         int thisX = (int) Math.round(xy.x);
         int thisY = (int) Math.round(xy.y);
-        long dx = (long) thisX - lastX;
-        long dy = (long) thisY - lastY;
-        if (dx * dx + dy * dy > RULER_BREAK_SQ) {
+        if (rulerBreaks(lastX, lastY, thisX, thisY)) {
           gp.moveTo(thisX - 2, thisY - 1);
         } else {
           gp.lineTo(thisX - 2, thisY - 1);
