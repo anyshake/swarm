@@ -53,6 +53,7 @@ public class Throbber extends JLabel implements Runnable {
 
   public synchronized void increment() {
     onCount++;
+    notifyAll();
   }
 
   /**
@@ -62,11 +63,13 @@ public class Throbber extends JLabel implements Runnable {
     onCount--;
     if (onCount <= 0) {
       off = true;
+      notifyAll();
     }
   }
 
-  public void close() {
+  public synchronized void close() {
     quit = true;
+    notifyAll();
   }
 
   private void setIcon(final ImageIcon icon) {
@@ -86,6 +89,14 @@ public class Throbber extends JLabel implements Runnable {
   public void run() {
     while (!quit) {
       try {
+        synchronized (this) {
+          while (!quit && onCount <= 0 && !off) {
+            wait();
+          }
+        }
+        if (quit) {
+          break;
+        }
         Thread.sleep(1000 / 8);
         if (onCount > 0) {
           setIcon(onIcons[cycle++ % 8]);
@@ -96,6 +107,8 @@ public class Throbber extends JLabel implements Runnable {
           off = false;
           cycle = 0;
         }
+      } catch (InterruptedException e) {
+        // close() wakes this thread
       } catch (Exception e) {
         //
       }
