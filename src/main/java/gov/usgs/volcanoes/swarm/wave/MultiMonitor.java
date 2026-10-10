@@ -18,6 +18,7 @@ import gov.usgs.volcanoes.swarm.SwarmConfig;
 import gov.usgs.volcanoes.swarm.SwarmFrame;
 import gov.usgs.volcanoes.swarm.SwarmUtil;
 import gov.usgs.volcanoes.swarm.Throbber;
+import gov.usgs.volcanoes.swarm.Workers;
 import gov.usgs.volcanoes.swarm.chooser.DataChooser;
 import gov.usgs.volcanoes.swarm.data.SeismicDataSource;
 import gov.usgs.volcanoes.swarm.wave.WaveViewSettings.ViewType;
@@ -42,12 +43,15 @@ import java.awt.geom.AffineTransform;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -535,6 +539,34 @@ public class MultiMonitor extends SwarmFrame implements Kioskable {
     });
   }
 
+  private final Object tickLock = new Object();
+  private boolean ticksSet;
+  private double tickMin;
+  private double tickMax;
+  private int tickCount;
+  private double[] ticks;
+
+  /**
+   * Grid line times. Every panel shares the monitor's time window, so they are worked out once per
+   * window instead of once per panel. This also keeps panels painted in parallel off SmartTick's
+   * shared date formats.
+   */
+  private double[] timeTicks(final double min, final double max, final int count) {
+    synchronized (tickLock) {
+      if (!ticksSet || count != tickCount
+          || Double.doubleToLongBits(min) != Double.doubleToLongBits(tickMin)
+          || Double.doubleToLongBits(max) != Double.doubleToLongBits(tickMax)) {
+        final Object[] stt = SmartTick.autoTimeTick(min, max, count);
+        ticks = stt == null ? null : (double[]) stt[0];
+        tickMin = min;
+        tickMax = max;
+        tickCount = count;
+        ticksSet = true;
+      }
+      return ticks;
+    }
+  }
+
   private class MonitorWaveDecorator extends FrameDecorator {
     private final WaveViewPanel panel;
 
@@ -569,10 +601,10 @@ public class MultiMonitor extends SwarmFrame implements Kioskable {
       rr.color = Color.GRAY;
       rr.backgroundColor = LABEL_BACK;
 
-      final int hTicks = fr.getGraphWidth() / 108;
-      final Object[] stt = SmartTick.autoTimeTick(fr.getMinXAxis(), fr.getMaxXAxis(), hTicks);
-      if (stt != null) {
-        ar.createVerticalGridLines((double[]) stt[0]);
+      final double[] ticks =
+          timeTicks(fr.getMinXAxis(), fr.getMaxXAxis(), fr.getGraphWidth() / 108);
+      if (ticks != null) {
+        ar.createVerticalGridLines(ticks);
       }
 
       if (panel.getSettings().viewType == ViewType.WAVE && panel.getHeight() > 36) {
@@ -670,7 +702,7 @@ public class MultiMonitor extends SwarmFrame implements Kioskable {
    * 
    * @param i index
    */
-  public void removeWaveAtIndex(final int i) {
+  public synchronized void removeWaveAtIndex(final int i) {
     final WaveViewPanel wvp = panels.get(i);
     waveMap.remove(wvp.getChannel());
     panels.remove(i);
@@ -681,7 +713,7 @@ public class MultiMonitor extends SwarmFrame implements Kioskable {
   /**
    * Remove all waves from monitor.
    */
-  public void removeAllWaves() {
+  public synchronized void removeAllWaves() {
     waveMap.clear();
     panels.clear();
     wavePanel.removeAll();
@@ -757,31 +789,39 @@ public class MultiMonitor extends SwarmFrame implements Kioskable {
     return times;
   }
 
-  private boolean sliding = false;
+  private final AtomicBoolean sliding = new AtomicBoolean();
 
-  private synchronized void slide() {
-    if (sliding) {
+  /**
+   * Move every panel to the current window. Panels paint their own images, so they are painted in
+   * parallel; a tick that arrives while the previous one is still painting is skipped.
+   */
+  private void slide() {
+    if (!sliding.compareAndSet(false, true)) {
       return;
     }
 
-    final Runnable r = new Runnable() {
+    Workers.execute(new Runnable() {
       public void run() {
-        sliding = true;
-        final double[] times = getTimeWindow();
-        final double now = times[1];
-        final double start = times[0];
-        for (int i = 0; i < panels.size(); i++) {
-          final WaveViewPanel waveViewPanel = panels.get(i);
-          final Wave wave = waveMap.get(waveViewPanel.getChannel());
-          waveViewPanel.setWave(wave, start, now);
+        try {
+          final double[] times = getTimeWindow();
+          final double now = times[1];
+          final double start = times[0];
+          final WaveViewPanel[] current;
+          synchronized (MultiMonitor.this) {
+            current = panels.toArray(new WaveViewPanel[panels.size()]);
+          }
+          Arrays.stream(current).parallel().forEach(new Consumer<WaveViewPanel>() {
+            public void accept(final WaveViewPanel waveViewPanel) {
+              final Wave wave = waveMap.get(waveViewPanel.getChannel());
+              waveViewPanel.setWave(wave, start, now);
+            }
+          });
+          wavePanel.repaint();
+        } finally {
+          sliding.set(false);
         }
-        wavePanel.repaint();
-        sliding = false;
       }
-    };
-
-    final Thread worker = new Thread(r);
-    worker.start();
+    });
   }
 
   /**
@@ -803,59 +843,66 @@ public class MultiMonitor extends SwarmFrame implements Kioskable {
       return;
     }
 
-    final Runnable r = new Runnable() {
+    throbber.increment();
+    Workers.execute(new Runnable() {
       public void run() {
-        throbber.increment();
-        String channel = null;
+        try {
+          fetch();
+        } finally {
+          throbber.decrement();
+        }
+      }
+    });
+  }
 
-        final double[] times = getTimeWindow();
-        final double now = times[1];
-        final double start = times[0];
-        for (int i = 0; i < panels.size(); i++) {
-          final WaveViewPanel wvp = panels.get(i);
-          wvp.setWorking(true);
-          channel = wvp.getChannel();
-          try {
-            Wave sw = waveMap.get(channel);
-            if (sw != null) {
-              if (sw.overlaps(start, now)) { // runaway monitor bug fix
-                if (sw.getEndTime() < now) {
-                  final Wave w2 = dataSource.getWave(channel, sw.getEndTime() - 10, now);
-                  if (w2 != null && (sw.overlaps(w2) || sw.adjacent(w2))) {
-                    sw = sw.combine(w2);
-                  }
-                }
-                if (sw.getStartTime() > start) {
-                  final Wave w2 = dataSource.getWave(channel, start, sw.getStartTime() + 10);
-                  if (w2 != null && (sw.overlaps(w2) || sw.adjacent(w2))) {
-                    sw = sw.combine(w2);
-                  }
-                }
-                sw = sw.subset(start, sw.getEndTime());
-              } else {
-                sw = null;
+  private void fetch() {
+    String channel = null;
+
+    final double[] times = getTimeWindow();
+    final double now = times[1];
+    final double start = times[0];
+    final WaveViewPanel[] current;
+    synchronized (this) {
+      current = panels.toArray(new WaveViewPanel[panels.size()]);
+    }
+    for (final WaveViewPanel wvp : current) {
+      wvp.setWorking(true);
+      channel = wvp.getChannel();
+      try {
+        Wave sw = waveMap.get(channel);
+        if (sw != null) {
+          if (sw.overlaps(start, now)) { // runaway monitor bug fix
+            if (sw.getEndTime() < now) {
+              final Wave w2 = dataSource.getWave(channel, sw.getEndTime() - 10, now);
+              if (w2 != null && (sw.overlaps(w2) || sw.adjacent(w2))) {
+                sw = sw.combine(w2);
               }
             }
-
-            // something bad happened above, just get the whole wave
-            if (sw == null) {
-              sw = dataSource.getWave(channel, start, now);
+            if (sw.getStartTime() > start) {
+              final Wave w2 = dataSource.getWave(channel, start, sw.getStartTime() + 10);
+              if (w2 != null && (sw.overlaps(w2) || sw.adjacent(w2))) {
+                sw = sw.combine(w2);
+              }
             }
-            if (sw != null) {
-              waveMap.put(channel, sw);
-            }
-          } catch (final Throwable t) {
-            System.out.println(channel);
-            t.printStackTrace();
+            sw = sw.subset(start, sw.getEndTime());
+          } else {
+            sw = null;
           }
-          wvp.setWorking(false);
         }
-        throbber.decrement();
-      }
-    };
 
-    final Thread worker = new Thread(r);
-    worker.start();
+        // something bad happened above, just get the whole wave
+        if (sw == null) {
+          sw = dataSource.getWave(channel, start, now);
+        }
+        if (sw != null) {
+          waveMap.put(channel, sw);
+        }
+      } catch (final Throwable t) {
+        System.out.println(channel);
+        t.printStackTrace();
+      }
+      wvp.setWorking(false);
+    }
   }
 
   /**
