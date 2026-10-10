@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>gov.usgs.volcanoes</groupId>
 	<artifactId>swarm</artifactId>
-	<version>3.2.1-anyshake.1</version>
+	<version>3.2.1-anyshake.2</version>
 	<packaging>jar</packaging>
 
 	<name>Swarm</name>
@@ -122,7 +122,7 @@
 		<repository>
 			<id>volcanoes</id>
 			<releases>
-				<checksumPolicy>true</checksumPolicy>
+				<checksumPolicy>warn</checksumPolicy>
 			</releases>
 			<url>https://volcanoes.usgs.gov/software/maven2/</url>
 		</repository>
@@ -290,6 +290,7 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-assembly-plugin</artifactId>
+				<version>3.3.0</version>
 				<configuration>
 					<descriptors>
 						<descriptor>src/assembly/swarmBin.xml</descriptor>
