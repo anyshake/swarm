@@ -34,6 +34,7 @@ import gov.usgs.volcanoes.swarm.wave.WaveViewSettings.ViewType;
 import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Dimension;
+import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
@@ -142,6 +143,10 @@ public class WaveViewPanel extends JComponent {
   private static final Color UNCERTAINTY_CODA = halfAlpha(Color.YELLOW);
   private final Line2D.Double overlayLine = new Line2D.Double();
   private final GeneralPath markPath = new GeneralPath();
+  private Font labelFont;
+  private boolean labelAscentValid;
+  private int cachedLabelAscent;
+  private final HashMap<String, Integer> labelWidths = new HashMap<String, Integer>();
 
   /** Same RGB with alpha divided by two, matching the previous per-paint constructor. */
   private static Color halfAlpha(Color color) {
@@ -1203,6 +1208,36 @@ public class WaveViewPanel extends JComponent {
   }
 
   /**
+   * Label width and ascent for the current font. Cursor repaints redraw the same tags, so the
+   * measurements stay with the font instead of being taken again.
+   */
+  private void ensureLabelMetrics(Graphics2D g2) {
+    Font font = g2.getFont();
+    if (labelAscentValid && font == labelFont) {
+      return;
+    }
+    labelFont = font;
+    labelWidths.clear();
+    cachedLabelAscent = g2.getFontMetrics().getAscent();
+    labelAscentValid = true;
+  }
+
+  private int labelWidth(Graphics2D g2, String text) {
+    ensureLabelMetrics(g2);
+    Integer width = labelWidths.get(text);
+    if (width == null) {
+      width = Integer.valueOf(g2.getFontMetrics().stringWidth(text));
+      labelWidths.put(text, width);
+    }
+    return width.intValue();
+  }
+
+  private int labelAscent(Graphics2D g2) {
+    ensureLabelMetrics(g2);
+    return cachedLabelAscent;
+  }
+
+  /**
    * Draw pick marks.
    * 
    * @param pick pick to draw
@@ -1262,9 +1297,8 @@ public class WaveViewPanel extends JComponent {
     } else {
       g2.setColor(color);
     }
-    FontMetrics fm = g2.getFontMetrics();
-    int width = fm.stringWidth(tag);
-    int height = fm.getAscent();
+    int width = labelWidth(g2, tag);
+    int height = labelAscent(g2);
     int offset = 2;
     int lw = width + 2 * offset;
     g2.fillRect((int) x, 3, lw, height + 2 * offset);
@@ -1273,7 +1307,7 @@ public class WaveViewPanel extends JComponent {
     g2.setColor(Color.BLACK);
     g2.drawRect((int) x, 3, lw, height + 2 * offset);
 
-    g2.drawString(tag, (int) x + offset, 3 + (fm.getAscent() + offset));
+    g2.drawString(tag, (int) x + offset, 3 + (height + offset));
 
   }
 
@@ -1308,9 +1342,8 @@ public class WaveViewPanel extends JComponent {
     } else {
       g2.setColor(color);
     }
-    FontMetrics fm = g2.getFontMetrics();
-    int width = fm.stringWidth(tag.classification);
-    int height = fm.getAscent();
+    int width = labelWidth(g2, tag.classification);
+    int height = labelAscent(g2);
     int offset = 2;
     int lw = width + 2 * offset;
     g2.fillRect((int) x, 3, lw, height + 2 * offset);
@@ -1319,7 +1352,7 @@ public class WaveViewPanel extends JComponent {
     g2.setColor(Color.BLACK);
     g2.drawRect((int) x, 3, lw, height + 2 * offset);
 
-    g2.drawString(tag.classification, (int) x + offset, 3 + (fm.getAscent() + offset));
+    g2.drawString(tag.classification, (int) x + offset, 3 + (height + offset));
 
   }
 
