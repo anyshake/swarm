@@ -1062,6 +1062,8 @@ public class DataChooser extends JPanel {
     TreeMap<String, GroupNode> rootMap = new TreeMap<String, GroupNode>();
     HashMap<String, GroupNode> groupMap = new HashMap<String, GroupNode>();
     HashSet<GroupNode> openGroups = new HashSet<GroupNode>();
+    HashMap<GroupNode, ArrayList<GroupNode>> subgroups =
+        new HashMap<GroupNode, ArrayList<GroupNode>>();
 
     GroupNode allNode = new GroupNode(Messages.getString("DataChooser.allGroup")); //$NON-NLS-1$
     AbstractChooserNode rootNode = node;
@@ -1114,20 +1116,7 @@ public class DataChooser extends JPanel {
             if (nn == null) {
               nn = new GroupNode(ss[i]);
               groupMap.put(cs, nn);
-              int j = 0;
-              for (j = 0; j < cn.getChildCount(); j++) {
-                if (cn.getChildAt(j) instanceof GroupNode) {
-                  GroupNode ogn = (GroupNode) cn.getChildAt(j);
-                  if (nn.getName().compareToIgnoreCase(ogn.getName()) <= 0) {
-                    break;
-                  }
-                }
-              }
-              if (j >= cn.getChildCount()) {
-                cn.add(nn);
-              } else {
-                cn.insert(nn, j);
-              }
+              insertSubgroup(subgroups, cn, nn);
             }
             if (fo) {
               openGroups.add(nn);
@@ -1158,6 +1147,41 @@ public class DataChooser extends JPanel {
     nearestList.repaint();
     // }
     // });
+  }
+
+  /**
+   * Insert a new group before the first sibling group whose name is not smaller, ignoring case, or
+   * after all children if there is none. The sibling groups stay sorted that way, so the list kept
+   * per parent can be searched by halves instead of comparing against every child.
+   *
+   * @param subgroups group children of each parent, in child order
+   * @param parent parent group
+   * @param child new group
+   */
+  private static void insertSubgroup(Map<GroupNode, ArrayList<GroupNode>> subgroups,
+      GroupNode parent, GroupNode child) {
+    ArrayList<GroupNode> siblings = subgroups.get(parent);
+    if (siblings == null) {
+      siblings = new ArrayList<GroupNode>();
+      subgroups.put(parent, siblings);
+    }
+    String name = child.getName();
+    int lo = 0;
+    int hi = siblings.size();
+    while (lo < hi) {
+      int mid = (lo + hi) >>> 1;
+      if (name.compareToIgnoreCase(siblings.get(mid).getName()) <= 0) {
+        hi = mid;
+      } else {
+        lo = mid + 1;
+      }
+    }
+    if (lo < siblings.size()) {
+      parent.insert(child, parent.getIndex(siblings.get(lo)));
+    } else {
+      parent.add(child);
+    }
+    siblings.add(lo, child);
   }
 
   private Set<String> getGroupChannels(GroupNode gn) {
