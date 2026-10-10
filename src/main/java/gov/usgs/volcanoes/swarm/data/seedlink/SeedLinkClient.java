@@ -323,15 +323,22 @@ public class SeedLinkClient implements Runnable {
   /*
    * taken from Robert Casey's PDCC seed code.
    * rate = |factor|^sign(factor) * |multiplier|^sign(multiplier), which is the value itself
-   * when positive and its reciprocal when negative.
+   * when positive and its reciprocal when negative. Non-finite factors keep the power
+   * expression, because a zero times NaN is not zero and an infinity is not its reciprocal.
    */
   private static float getSampleRate(double factor, double multiplier) {
-    if (factor == 0.0 || multiplier == 0.0) {
-      return 10000.0f;
+    if (Double.isFinite(factor) && Double.isFinite(multiplier) && factor != 0.0
+        && multiplier != 0.0) {
+      double rate = (factor > 0.0 ? factor : 1.0 / -factor)
+          * (multiplier > 0.0 ? multiplier : 1.0 / -multiplier);
+      return (float) rate;
     }
-    double rate = (factor > 0.0 ? factor : 1.0 / -factor)
-        * (multiplier > 0.0 ? multiplier : 1.0 / -multiplier);
-    return (float) rate;
+    float sampleRate = 10000.0f;
+    if ((factor * multiplier) != 0.0) {
+      sampleRate = (float) (Math.pow(Math.abs(factor), (factor / Math.abs(factor)))
+          * Math.pow(Math.abs(multiplier), (multiplier / Math.abs(multiplier))));
+    }
+    return sampleRate;
   }
 
   private static final ThreadLocal<Calendar> GMT_CALENDAR = new ThreadLocal<Calendar>() {
