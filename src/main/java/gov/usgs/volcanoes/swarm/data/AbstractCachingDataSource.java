@@ -46,6 +46,9 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
   protected Map<String, List<CachedHelicorder>> helicorderCache;
   protected Map<String, List<CachedWave>> waveCache;
   protected Map<String, List<CachedRsam>> rsamCache;
+  private long waveBytes;
+  private long heliBytes;
+  private long rsamBytes;
   protected CachePurgeAction[] purgeActions;
   protected static Logger logger;
   protected static final JFrame applicationFrame = Swarm.getApplicationFrame();
@@ -85,10 +88,7 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
    * @return
    */
   public synchronized long getSize() {
-    long size = getSize(waveCache);
-    size += getSize(helicorderCache);
-    size += getSize(rsamCache);
-    return size;
+    return waveBytes + heliBytes + rsamBytes;
   }
 
   private synchronized <T extends CacheEntry> long getSize(final Map<String, List<T>> cache) {
@@ -193,6 +193,7 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
     cw.wave = wave;
     cw.lastAccess = System.currentTimeMillis();
     waves.add(cw);
+    waveBytes += cw.getMemorySize();
     enforceSize();
   }
 
@@ -202,7 +203,7 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
    * @param station channel
    * @param rsamData rsam data
    */
-  public void putRsam(final String station, RSAMData rsamData) {
+  public synchronized void putRsam(final String station, RSAMData rsamData) {
     if (rsamData == null || rsamData.getData() == null) {
       return;
     }
@@ -218,6 +219,7 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
       cr.lastAccess = System.currentTimeMillis();
       rsams.add(cr);
       rsamCache.put(station, rsams);
+      rsamBytes += cr.getMemorySize();
       enforceSize();
     } else {
       boolean add = true;
@@ -225,6 +227,7 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
         final CachedRsam ch = rsams.get(i);
         if (ch.rsamData.overlaps(rsamData) && rsamData != ch.rsamData) {
           rsams.remove(ch);
+          rsamBytes -= ch.getMemorySize();
           final RSAMData newRsam = ch.rsamData.combine(rsamData);
           putRsam(station, newRsam);
           rsamData = newRsam;
@@ -241,6 +244,7 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
         ch.rsamData = rsamData;
         ch.lastAccess = System.currentTimeMillis();
         rsams.add(ch);
+        rsamBytes += ch.getMemorySize();
         enforceSize();
       }
     }
@@ -264,6 +268,7 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
       ch.lastAccess = System.currentTimeMillis();
       helis.add(ch);
       helicorderCache.put(station, helis);
+      heliBytes += ch.getMemorySize();
       enforceSize();
     } else {
       boolean add = true;
@@ -272,9 +277,11 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
 
         if (ch.helicorder.overlaps(helicorder)) {
           final HelicorderData newHeli = ch.helicorder.combine(helicorder);
+          final long before = ch.getMemorySize();
           ch.t1 = newHeli.getStartTime();
           ch.t2 = newHeli.getEndTime();
           ch.helicorder = newHeli;
+          heliBytes += ch.getMemorySize() - before;
           ch.lastAccess = System.currentTimeMillis();
 
           helicorder = newHeli;
@@ -292,6 +299,7 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
         ch.helicorder = helicorder;
         ch.lastAccess = System.currentTimeMillis();
         helis.add(ch);
+        heliBytes += ch.getMemorySize();
         enforceSize();
       }
     }
@@ -514,6 +522,7 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
           final Wave newWave = cw.wave.combine(wave);
           if (newWave != null) {
             waves.remove(cw);
+            waveBytes -= cw.getMemorySize();
             putWave(station, newWave);
           }
           return;
@@ -651,11 +660,13 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
 
   private void flushHelicorders() {
     helicorderCache.clear();// = new HashMap();
+    heliBytes = 0;
     System.out.println("Helicorder Cache Flushed");
   }
 
   private void flushWaves() {
     waveCache.clear();// = new HashMap();
+    waveBytes = 0;
     System.out.println("Wave Cache Flushed");
   }
 
@@ -679,6 +690,13 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
   private synchronized <T extends CacheEntry> void removeEntryFromCache(final CacheEntry ce,
       final Map<String, List<T>> cache) {
     final List<T> cl = cache.get(ce.station);
+    if (cache == waveCache) {
+      waveBytes -= ce.getMemorySize();
+    } else if (cache == helicorderCache) {
+      heliBytes -= ce.getMemorySize();
+    } else if (cache == rsamCache) {
+      rsamBytes -= ce.getMemorySize();
+    }
     cl.remove(ce);
     System.out.println("Removed: " + ce.getInfoString());
   }
@@ -707,7 +725,9 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
           cw.wave = cw.wave.subset(nst, cw.wave.getEndTime());
           cw.t1 = cw.wave.getStartTime();
           cw.t2 = cw.wave.getEndTime();
-          chunk += cw.getMemorySize() - before;
+          final long delta = cw.getMemorySize() - before;
+          waveBytes += delta;
+          chunk += delta;
         }
       }
       return chunk;
@@ -924,6 +944,7 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
     public long purge() {
       final long size = getSize(cache);
       cache.clear();// = new HashMap();
+      waveBytes = 0;
       return size;
     }
   }
@@ -939,6 +960,7 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
     public long purge() {
       final long size = getSize(cache);
       cache.clear();// = new HashMap();
+      heliBytes = 0;
       return size;
     }
   }
