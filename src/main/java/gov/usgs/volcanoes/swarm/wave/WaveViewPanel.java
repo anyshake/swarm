@@ -197,8 +197,8 @@ public class WaveViewPanel extends JComponent {
   private long filterCorner2Bits;
   private String filterText = "";
   /**
-   * Cursor timestamps stay on this formatter. Mouse handling is on the event thread, so it is not
-   * shared with another thread. A new one is built when the default locale changes.
+   * Cursor timestamps stay on this formatter. Mouse handling is on the event thread, so each panel
+   * keeps its own and it is not shared. A new one is built when the format locale changes.
    */
   private SimpleDateFormat cursorFormat;
   private Locale cursorFormatLocale;
@@ -206,8 +206,8 @@ public class WaveViewPanel extends JComponent {
   private boolean cursorTextValid;
   private long cursorTimeBits;
   private TimeZone cursorZone;
-  private int cursorRawOffset;
-  private int cursorDstSavings;
+  /** Millisecond zone offset divided by 1000, the same integer division as getTimeString. */
+  private int cursorOffsetSeconds;
   private String cursorText;
   private final StringBuilder statusBuffer = new StringBuilder(256);
   private boolean durationTextValid;
@@ -796,41 +796,38 @@ public class WaveViewPanel extends JComponent {
 
   /**
    * Same text as {@link StatusTextArea#getTimeString}. The formatter matches {@link Time#format}
-   * and is reused for later samples instead of constructing one per hover.
+   * and is reused until the sample, zone, format locale, or applied offset changes. That offset is
+   * the millisecond value divided by 1000 with integer division, so a daylight-rule edit that
+   * leaves the raw offset and savings unchanged still misses.
    */
   private String cursorTimeText(double j2k) {
     TimeZone zone = swarmConfig.getTimeZone(channel);
-    Locale locale = Locale.getDefault();
+    Locale locale = Locale.getDefault(Locale.Category.FORMAT);
     long bits = Double.doubleToLongBits(j2k);
-    int raw = zone.getRawOffset();
-    int dst = zone.getDSTSavings();
+    int offsetSeconds = zone.getOffset(J2kSec.asEpoch(j2k)) / 1000;
     if (cursorTextValid && bits == cursorTimeBits && zone == cursorZone
-        && locale == cursorFormatLocale && raw == cursorRawOffset && dst == cursorDstSavings) {
+        && locale == cursorFormatLocale && offsetSeconds == cursorOffsetSeconds) {
       return cursorText;
     }
-    cursorText = formatCursorTime(j2k, zone);
+    cursorText = formatCursorTime(j2k, zone, locale, offsetSeconds);
     cursorTimeBits = bits;
     cursorZone = zone;
-    cursorRawOffset = raw;
-    cursorDstSavings = dst;
+    cursorFormatLocale = locale;
+    cursorOffsetSeconds = offsetSeconds;
     cursorTextValid = true;
     return cursorText;
   }
 
-  private String formatCursorTime(double j2k, TimeZone zone) {
-    Locale locale = Locale.getDefault();
+  private String formatCursorTime(double j2k, TimeZone zone, Locale locale, int offsetSeconds) {
     if (cursorFormat == null || cursorFormatLocale != locale) {
-      cursorFormat = new SimpleDateFormat(Time.STANDARD_TIME_FORMAT_MS);
+      cursorFormat = new SimpleDateFormat(Time.STANDARD_TIME_FORMAT_MS, locale);
       cursorFormat.setTimeZone(Time.DEFAULT_TIME_ZONE);
-      cursorFormatLocale = locale;
     }
     String utc = formatCursorEpoch(j2k);
-    long epoch = J2kSec.asEpoch(j2k);
-    double tzo = zone.getOffset(epoch) / 1000.0;
-    if (tzo != 0) {
-      cursorDate.setTime(epoch);
+    if (offsetSeconds != 0) {
+      cursorDate.setTime(J2kSec.asEpoch(j2k));
       String tza = zone.getDisplayName(zone.inDaylightTime(cursorDate), TimeZone.SHORT);
-      String local = formatCursorEpoch(j2k + tzo);
+      String local = formatCursorEpoch(j2k + offsetSeconds);
       return local + " (" + tza + "), " + utc + " (UTC)";
     }
     return utc;
