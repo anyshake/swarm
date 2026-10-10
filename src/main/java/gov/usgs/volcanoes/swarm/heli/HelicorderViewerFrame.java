@@ -443,7 +443,7 @@ public class HelicorderViewerFrame extends SwarmFrame implements Kioskable {
           public void actionPerformed(final ActionEvent e) {
             scaleClipState = !scaleClipState;
             if (scaleClipState) {
-              autoScaleSlider.setValue(40 - (new Double(settings.barMult * 4).intValue()));
+              autoScaleSlider.setValue(40 - (int) (settings.barMult * 4));
               scaleButton.setIcon(Icons.waveclip);
               autoScaleSlider.setToolTipText("Adjust helicorder clip");
             } else {
@@ -471,7 +471,7 @@ public class HelicorderViewerFrame extends SwarmFrame implements Kioskable {
           if (scaleClipState) {
             settings.clipBars = autoScaleSlider.getValue() * 3;
           } else {
-            settings.barMult = 10 - (new Integer(autoScaleSlider.getValue()).doubleValue() / 4);
+            settings.barMult = 10 - autoScaleSlider.getValue() / 4.0;
           }
           repaintHelicorder();
         }
