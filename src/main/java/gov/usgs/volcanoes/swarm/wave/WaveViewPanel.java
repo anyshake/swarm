@@ -794,11 +794,12 @@ public class WaveViewPanel extends JComponent {
    */
   private String cursorTimeText(double j2k) {
     TimeZone zone = swarmConfig.getTimeZone(channel);
+    Locale locale = Locale.getDefault();
     long bits = Double.doubleToLongBits(j2k);
     int raw = zone.getRawOffset();
     int dst = zone.getDSTSavings();
-    if (cursorTextValid && bits == cursorTimeBits && zone == cursorZone && raw == cursorRawOffset
-        && dst == cursorDstSavings) {
+    if (cursorTextValid && bits == cursorTimeBits && zone == cursorZone
+        && locale == cursorFormatLocale && raw == cursorRawOffset && dst == cursorDstSavings) {
       return cursorText;
     }
     cursorText = formatCursorTime(j2k, zone);
