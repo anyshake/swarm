@@ -84,7 +84,6 @@ public class RsamViewPanel extends JComponent implements SettingsListener {
    * The wave is rendered to an image that is only updated when the settings change for repaint
    * efficiency.
    */
-  private BufferedImage image;
   private final transient Offscreen offscreen = new Offscreen();
   private Plot plot;
   private RSAMData countedData;
@@ -165,9 +164,12 @@ public class RsamViewPanel extends JComponent implements SettingsListener {
     processSettings();
   }
 
-  private synchronized BufferedImage getImage() {
-    image = offscreen.displayed();
-    return image;
+  /**
+   * Reads the last published frame without the plot lock, so a repaint does not stall while the
+   * next frame is built.
+   */
+  private BufferedImage getImage() {
+    return offscreen.displayed();
   }
 
   private void createImage() {
