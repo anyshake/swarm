@@ -72,7 +72,7 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
   /**
    * Flush.
    */
-  public void flush() {
+  public synchronized void flush() {
     flushWaves();
     flushHelicorders();
   }
@@ -276,8 +276,8 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
         final CachedHelicorder ch = helis.get(i);
 
         if (ch.helicorder.overlaps(helicorder)) {
-          final HelicorderData newHeli = ch.helicorder.combine(helicorder);
           final long before = ch.getMemorySize();
+          final HelicorderData newHeli = ch.helicorder.combine(helicorder);
           ch.t1 = newHeli.getStartTime();
           ch.t2 = newHeli.getEndTime();
           ch.helicorder = newHeli;
@@ -519,10 +519,11 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
         }
 
         if (join) {
+          final long before = cw.getMemorySize();
           final Wave newWave = cw.wave.combine(wave);
           if (newWave != null) {
             waves.remove(cw);
-            waveBytes -= cw.getMemorySize();
+            waveBytes -= before;
             putWave(station, newWave);
           }
           return;
@@ -658,13 +659,13 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
     return null;
   }
 
-  private void flushHelicorders() {
+  private synchronized void flushHelicorders() {
     helicorderCache.clear();// = new HashMap();
     heliBytes = 0;
     System.out.println("Helicorder Cache Flushed");
   }
 
-  private void flushWaves() {
+  private synchronized void flushWaves() {
     waveCache.clear();// = new HashMap();
     waveBytes = 0;
     System.out.println("Wave Cache Flushed");
