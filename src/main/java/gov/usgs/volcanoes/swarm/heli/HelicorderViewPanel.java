@@ -94,6 +94,8 @@ public class HelicorderViewPanel extends JComponent implements SwarmOptionsListe
   private WaveViewPanel insetWavePanel;
 
   private final transient Offscreen offscreen = new Offscreen();
+  private transient Offscreen.Painter plotPainter;
+  private transient SmallDecorator minimalDecorator;
 
   private boolean working;
   private boolean resized;
@@ -650,11 +652,14 @@ public class HelicorderViewPanel extends JComponent implements SwarmOptionsListe
       repaint();
       return;
     }
-    offscreen.render(this, new Offscreen.Painter() {
-      public void paint(Graphics2D graphics) {
-        drawHelicorder(graphics);
-      }
-    }, true);
+    if (plotPainter == null) {
+      plotPainter = new Offscreen.Painter() {
+        public void paint(Graphics2D graphics) {
+          drawHelicorder(graphics);
+        }
+      };
+    }
+    offscreen.render(this, plotPainter, true);
   }
 
   protected void setResized(boolean b) {
@@ -701,7 +706,10 @@ public class HelicorderViewPanel extends JComponent implements SwarmOptionsListe
     if (minimal) {
       // System.out.println("minimal");
       // heliRenderer.createMinimumAxis();
-      heliRenderer.setFrameDecorator(new SmallDecorator());
+      if (minimalDecorator == null) {
+        minimalDecorator = new SmallDecorator();
+      }
+      heliRenderer.setFrameDecorator(minimalDecorator);
     } else {
       heliRenderer.createDefaultAxis();
     }
@@ -723,6 +731,8 @@ public class HelicorderViewPanel extends JComponent implements SwarmOptionsListe
   }
 
   class SmallDecorator extends FrameDecorator {
+    private final Date rowLabelDate = new Date();
+
     public void decorate(FrameRenderer fr) {
       AxisRenderer axis = new AxisRenderer(fr);
       axis.createDefault();
@@ -778,16 +788,19 @@ public class HelicorderViewPanel extends JComponent implements SwarmOptionsListe
       for (int i = numRows - 1; i >= 0; i--) {
         pixelsPast += pixelsPerRow;
 
-        Date dtz = J2kSec.asDate(hr.getHelicorderMaxX() - (i + 1) * settings.timeChunk);
+        double rowJ2k = hr.getHelicorderMaxX() - (i + 1) * settings.timeChunk;
+        long rowStartMs = J2kSec.asEpoch(rowJ2k);
+        rowLabelDate.setTime(rowStartMs);
         if (pixelsPast > 20) {
           left--;
           leftLabelPos[left] = i + 0.5;
-          leftLabelText[left] = rowTimeFormat.format(dtz);
+          leftLabelText[left] = rowTimeFormat.format(rowLabelDate);
           pixelsPast = 0;
         }
 
-        String localDay =
-            rowDayFormat.format(new Date(dtz.getTime() + settings.timeChunk * 1000));
+        // timeChunk * 1000 stays an int multiply so a huge chunk overflows the same way.
+        rowLabelDate.setTime(rowStartMs + settings.timeChunk * 1000);
+        String localDay = rowDayFormat.format(rowLabelDate);
         if (!localDay.equals(lastLocalDay)) {
           right--;
           rightLabelPos[right] = i + 0.5;
@@ -801,7 +814,8 @@ public class HelicorderViewPanel extends JComponent implements SwarmOptionsListe
       axis.createRightTickLabels(Arrays.copyOfRange(rightLabelPos, right, numRows),
           Arrays.copyOfRange(rightLabelText, right, numRows));
 
-      boolean dst = timeZone.inDaylightTime(J2kSec.asDate(hr.getViewEndTime()));
+      rowLabelDate.setTime(J2kSec.asEpoch(hr.getViewEndTime()));
+      boolean dst = timeZone.inDaylightTime(rowLabelDate);
       String timeZoneName = timeZone.getDisplayName(dst, TimeZone.SHORT);
       TextRenderer tr =
           new TextRenderer(3, fr.getGraphY() + fr.getGraphHeight() + 14, timeZoneName);
