@@ -16,6 +16,8 @@ import javax.swing.event.DocumentListener;
 @SuppressWarnings("serial")
 public class MapLinePreview extends JPanel {
 
+  private static final Color INVALID_WIDTH = new Color(253, 130, 130);
+
   SwarmConfig config = SwarmConfig.getInstance();
   LinePreviewPane linePreviewPane = new LinePreviewPane();
   LineWidthPane lineWidthPane = new LineWidthPane();
@@ -44,6 +46,9 @@ public class MapLinePreview extends JPanel {
   // @SuppressWarnings("serial")
   public class LinePreviewPane extends JPanel {
     Color lineColor;
+    private BasicStroke stroke;
+    private int strokeWidth = Integer.MIN_VALUE;
+    private final Line2D.Double line = new Line2D.Double();
 
     public LinePreviewPane() {
       setPreferredSize(new Dimension(200, 50));
@@ -59,10 +64,14 @@ public class MapLinePreview extends JPanel {
       Graphics2D g2 = (Graphics2D) g;
       // System.out.println(lineColor + " : " + lineWidth);
       g2.setPaintMode();
-      g2.setStroke(new BasicStroke(config.mapLineWidth));
-      g2.setStroke(new BasicStroke(lineWidth));
+      if (stroke == null || strokeWidth != lineWidth) {
+        stroke = new BasicStroke(lineWidth);
+        strokeWidth = lineWidth;
+      }
+      g2.setStroke(stroke);
       g2.setColor(lineColor);
-      Line2D.Double line = new Line2D.Double(0, getHeight() / 2, getWidth(), getHeight() / 2);
+      final int mid = getHeight() / 2;
+      line.setLine(0, mid, getWidth(), mid);
       g2.draw(line);
     }
 
@@ -108,7 +117,7 @@ public class MapLinePreview extends JPanel {
         widthBox.setBackground(Color.white);
         linePreviewPane.repaint();
       } catch (NumberFormatException e) {
-        widthBox.setBackground(new Color(253, 130, 130));
+        widthBox.setBackground(INVALID_WIDTH);
       }
     }
   }
