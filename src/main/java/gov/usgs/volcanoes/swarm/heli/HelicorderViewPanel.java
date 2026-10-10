@@ -45,6 +45,7 @@ import java.awt.geom.Line2D;
 import java.awt.geom.Rectangle2D;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.TimeZone;
 import javax.swing.JComponent;
@@ -738,25 +739,32 @@ public class HelicorderViewPanel extends JComponent implements SwarmOptionsListe
       axis.createTopTicks(null, mjt);
       axis.createVerticalGridLines(mjt);
 
+      // A label slot without text still becomes a renderer that draws nothing and restores the
+      // graphics state, so only the filled slots are passed on, in their original order.
       int bc = (settings.timeChunk / 5) + 2;
       String[] btl = new String[bc];
       double[] btlv = new double[bc];
       btl[0] = "+";
       btlv[0] = 30;
-      for (int i = 0, j = 1; i < mjt.length; i++) {
+      int j = 1;
+      for (int i = 0; i < mjt.length; i++) {
         long m = Math.round(mjt[i] / 60.0);
         if (m % 5 == 0) {
           btl[j] = Long.toString(m);
           btlv[j++] = mjt[i];
         }
       }
-      axis.createBottomTickLabels(btlv, btl);
+      axis.createBottomTickLabels(Arrays.copyOf(btlv, j), Arrays.copyOf(btl, j));
 
       HelicorderRenderer hr = (HelicorderRenderer) fr;
       int numRows = hr.getNumRows();
-      double[] labelPosLr = new double[numRows];
+      // Rows are visited bottom up, so each list fills from its end to keep rows ascending.
+      double[] leftLabelPos = new double[numRows];
       String[] leftLabelText = new String[numRows];
+      double[] rightLabelPos = new double[numRows];
       String[] rightLabelText = new String[numRows];
+      int left = numRows;
+      int right = numRows;
       TimeZone timeZone = swarmConfig.getTimeZone(settings.channel);
       useRowFormats(timeZone);
 
@@ -765,27 +773,29 @@ public class HelicorderViewPanel extends JComponent implements SwarmOptionsListe
       String lastLocalDay = "";
       for (int i = numRows - 1; i >= 0; i--) {
         pixelsPast += pixelsPerRow;
-        labelPosLr[i] = i + 0.5;
 
-        String localTime = rowTimeFormat
-            .format(J2kSec.asDate(hr.getHelicorderMaxX() - (i + 1) * settings.timeChunk));
-        leftLabelText[i] = null;
+        Date dtz = J2kSec.asDate(hr.getHelicorderMaxX() - (i + 1) * settings.timeChunk);
         if (pixelsPast > 20) {
-          leftLabelText[i] = localTime;
+          left--;
+          leftLabelPos[left] = i + 0.5;
+          leftLabelText[left] = rowTimeFormat.format(dtz);
           pixelsPast = 0;
         }
 
-        Date dtz = J2kSec.asDate(hr.getHelicorderMaxX() - (i + 1) * settings.timeChunk);
         String localDay =
             rowDayFormat.format(new Date(dtz.getTime() + settings.timeChunk * 1000));
         if (!localDay.equals(lastLocalDay)) {
-          rightLabelText[i] = localDay;
+          right--;
+          rightLabelPos[right] = i + 0.5;
+          rightLabelText[right] = localDay;
           lastLocalDay = localDay;
         }
       }
 
-      axis.createLeftTickLabels(labelPosLr, leftLabelText);
-      axis.createRightTickLabels(labelPosLr, rightLabelText);
+      axis.createLeftTickLabels(Arrays.copyOfRange(leftLabelPos, left, numRows),
+          Arrays.copyOfRange(leftLabelText, left, numRows));
+      axis.createRightTickLabels(Arrays.copyOfRange(rightLabelPos, right, numRows),
+          Arrays.copyOfRange(rightLabelText, right, numRows));
 
       boolean dst = timeZone.inDaylightTime(J2kSec.asDate(hr.getViewEndTime()));
       String timeZoneName = timeZone.getDisplayName(dst, TimeZone.SHORT);
