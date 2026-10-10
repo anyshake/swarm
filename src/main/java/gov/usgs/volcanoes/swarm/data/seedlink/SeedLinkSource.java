@@ -215,7 +215,7 @@ public class SeedLinkSource extends SeismicDataSource {
       LOGGER.debug("SeedLinkSource getHelicorder: {} {} {}", scnl, J2kSec.toDateString(t1),
           J2kSec.toDateString(t2));
     }
-    scnl = scnl.replace(" ", "$"); // just to be sure
+    scnl = scnl.replace(' ', '$'); // just to be sure
     startRealtimeClient(scnl);
 
     CachedDataSource cache = CachedDataSource.getInstance();
@@ -252,7 +252,7 @@ public class SeedLinkSource extends SeismicDataSource {
       LOGGER.trace("SeedLinkSource getWave: {} {} {}", scnl, J2kSec.toDateString(t1),
           J2kSec.toDateString(t2));
     }
-    scnl = scnl.replace(" ", "$"); // just to be sure
+    scnl = scnl.replace(' ', '$'); // just to be sure
     startRealtimeClient(scnl);
 
     Wave wave = CachedDataSource.getInstance().getBestWave(scnl, t1, t2);
@@ -349,7 +349,7 @@ public class SeedLinkSource extends SeismicDataSource {
     // Other viewers may be using the station and there is no good way to check
     // Could be removed and added back later if other frames are using it but may lead to gaps in
     // data
-    station = station.replace(" ", "$");
+    station = station.replace(' ', '$');
     SeedLinkClient client = rtClients.remove(station);
     if (client != null) {
       LOGGER.debug("SeedLinkSource notifyDataNotNeeded: {}", client);

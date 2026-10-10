@@ -365,7 +365,7 @@ public class SeedLinkClient implements Runnable, SwarmConst, TimeConstants {
         String location = (String) blockette.getFieldVal(5);
         String channel = (String) blockette.getFieldVal(6);
         String scnl = station + " " + channel + " " + network + " " + location;
-        scnl = scnl.trim().replace(" ", "$");
+        scnl = scnl.trim().replace(' ', '$');
         cacheWave(scnl, wave);
       } catch (Exception ex) {
         LOGGER.warn("SeedLinkClient packetHandler: could not create wave: {}", this, ex);
