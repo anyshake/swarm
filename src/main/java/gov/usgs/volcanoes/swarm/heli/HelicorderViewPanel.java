@@ -646,6 +646,7 @@ public class HelicorderViewPanel extends JComponent implements SwarmOptionsListe
    */
   public void invalidateImage() {
     if (heliData == null) {
+      repaint();
       return;
     }
     offscreen.render(this, new Offscreen.Painter() {
