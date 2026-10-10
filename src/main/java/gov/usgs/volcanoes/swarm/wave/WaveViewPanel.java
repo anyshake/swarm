@@ -372,10 +372,11 @@ public class WaveViewPanel extends JComponent {
           }
 
           if (timeSeries && allowDragging && SwingUtilities.isLeftMouseButton(e)) {
-            Dimension size = getSize();
             int y = e.getY();
-            if (t != null && y > yOffset && y < (size.height - bottomHeight) && x > xOffset
-                && x < size.width - rightWidth) {
+            int panelWidth = getWidth();
+            int panelHeight = getHeight();
+            if (t != null && y > yOffset && y < (panelHeight - bottomHeight) && x > xOffset
+                && x < panelWidth - rightWidth) {
               j2k1 = j2k2 = j2k;
               if (e.isControlDown()) {
                 System.out.println(channel + ": " + J2kSec.toDateString(j2k1));
@@ -446,9 +447,10 @@ public class WaveViewPanel extends JComponent {
           double[] t = getTranslation();
           int x = e.getX();
           int y = e.getY();
-          Dimension size = getSize();
-          if (t != null && y > yOffset && y < (size.height - bottomHeight) && x > xOffset
-              && x < size.width - rightWidth) {
+          int panelWidth = getWidth();
+          int panelHeight = getHeight();
+          if (t != null && y > yOffset && y < (panelHeight - bottomHeight) && x > xOffset
+              && x < panelWidth - rightWidth) {
             j2k2 = x * t[0] + t[1];
             highlightX2 = x;
             repaint();
@@ -619,13 +621,14 @@ public class WaveViewPanel extends JComponent {
     StringBuilder status = new StringBuilder();
     String unit = null;
 
-    Dimension size = getSize();
+    int panelWidth = getWidth();
+    int panelHeight = getHeight();
     double[] t = getTranslation();
     double previousTime = time;
     time = Double.NaN;
 
-    if (wave != null && t != null && y > yOffset && y < (size.height - bottomHeight) && x > xOffset
-        && x < size.width - rightWidth) {
+    if (wave != null && t != null && y > yOffset && y < (panelHeight - bottomHeight)
+        && x > xOffset && x < panelWidth - rightWidth) {
       time = x * t[0] + t[1];
       double yi = y * -t[2] + t[3];
 
@@ -902,20 +905,21 @@ public class WaveViewPanel extends JComponent {
    */
   public void paint(Graphics g) {
     Graphics2D g2 = (Graphics2D) g;
-    Dimension dim = this.getSize();
+    int width = getWidth();
+    int height = getHeight();
     if (wave == null || wave.numSamples() < 1) {
       g2.setColor(backgroundColor);
-      g2.fillRect(0, 0, dim.width, dim.height);
+      g2.fillRect(0, 0, width, height);
       g2.setColor(Color.black);
       if (working) {
-        g2.drawString("Retrieving data...", dim.width / 2 - 50, dim.height / 2);
+        g2.drawString("Retrieving data...", width / 2 - 50, height / 2);
       } else {
         String error = "No wave data.";
         if (channel != null) {
           error = "No wave data for " + channel + ".";
         }
         int w = g2.getFontMetrics().stringWidth(error);
-        g2.drawString(error, dim.width / 2 - w / 2, dim.height / 2);
+        g2.drawString(error, width / 2 - w / 2, height / 2);
       }
     } else {
       BufferedImage bi = getImage();
@@ -939,15 +943,15 @@ public class WaveViewPanel extends JComponent {
         closeImg = Icons.close_view.getImage();
       }
 
-      g2.drawImage(closeImg, dim.width - 17, 3, null);
+      g2.drawImage(closeImg, width - 17, 3, null);
     }
     if (bottomBorderColor != null) {
       g2.setColor(bottomBorderColor);
-      g2.drawLine(0, dim.height - 1, dim.width, dim.height - 1);
+      g2.drawLine(0, height - 1, width, height - 1);
     }
     if (borderColor != null) {
       g2.setColor(borderColor);
-      g2.drawRect(0, 0, dim.width - 1, dim.height - 2);
+      g2.drawRect(0, 0, width - 1, height - 2);
     }
   }
 
@@ -1541,7 +1545,7 @@ public class WaveViewPanel extends JComponent {
     int width = x2 - x1 + 1;
     Paint pnt = g2.getPaint();
     g2.setPaint(DRAG_HIGHLIGHT);
-    g2.fillRect(x1, yOffset + 1, width, getSize().height - bottomHeight - yOffset);
+    g2.fillRect(x1, yOffset + 1, width, getHeight() - bottomHeight - yOffset);
     g2.setPaint(pnt);
   }
 
