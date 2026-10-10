@@ -144,6 +144,8 @@ public class WaveViewPanel extends JComponent {
 
   protected boolean pauseCursorMark;
   protected double time;
+  private Wave waveInfoSource;
+  private String waveInfoText;
 
   // pick and tag data
   private PickData pickData;
@@ -604,11 +606,12 @@ public class WaveViewPanel extends JComponent {
    * @param y the mouse y position
    */
   public boolean processMousePosition(int x, int y) {
-    StringBuffer status = new StringBuffer();
+    StringBuilder status = new StringBuilder();
     String unit = null;
 
     Dimension size = getSize();
     double[] t = getTranslation();
+    double previousTime = time;
     time = Double.NaN;
 
     if (wave != null && t != null && y > yOffset && y < (size.height - bottomHeight) && x > xOffset
@@ -616,7 +619,7 @@ public class WaveViewPanel extends JComponent {
       time = x * t[0] + t[1];
       double yi = y * -t[2] + t[3];
 
-      status.append(StatusTextArea.getWaveInfo(wave));
+      status.append(cachedWaveInfo());
 
       if (timeSeries) {
 
@@ -715,20 +718,31 @@ public class WaveViewPanel extends JComponent {
       }
     }
 
-    if (!pauseCursorMark) {
+    if (!pauseCursorMark && Double.compare(previousTime, time) != 0) {
       WaveViewTime.fireTimeChanged(time);
     }
 
-    if (status != null && statusText != null) {
-      final String st = status.toString();
+    final String statusTextValue = status.toString();
+    if (statusText != null) {
       SwingUtilities.invokeLater(new Runnable() {
         public void run() {
-          statusText.setText(st);
+          statusText.setText(statusTextValue);
         }
       });
     }
 
-    return !status.toString().equals(" ");
+    return !statusTextValue.equals(" ");
+  }
+
+  /**
+   * Wave header for the status bar. Sample range and RSAM stay fixed until the wave object changes.
+   */
+  private String cachedWaveInfo() {
+    if (wave != waveInfoSource) {
+      waveInfoSource = wave;
+      waveInfoText = StatusTextArea.getWaveInfo(wave);
+    }
+    return waveInfoText;
   }
 
   /**
@@ -740,6 +754,7 @@ public class WaveViewPanel extends JComponent {
    */
   public void setWave(Wave sw, double st, double et) {
     wave = sw;
+    waveInfoSource = null;
     startTime = st;
     endTime = et;
     processSettings();
@@ -1493,6 +1508,9 @@ public class WaveViewPanel extends JComponent {
   }
 
   public void setCursorMark(double j2k) {
+    if (Double.compare(cursorMark, j2k) == 0) {
+      return;
+    }
     cursorMark = j2k;
     repaint();
   }
