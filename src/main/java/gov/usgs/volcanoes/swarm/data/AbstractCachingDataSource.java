@@ -508,6 +508,10 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
     } else {
       HelicorderData hd = new HelicorderData();
       HelicorderData hd2 = null;
+      // The pieces are stacked by one compose below. Concatenating them one at a time recopied
+      // everything gathered so far for every piece.
+      final List<DoubleMatrix2D> parts = new ArrayList<DoubleMatrix2D>();
+      int columns = 0;
       for (final CachedHelicorder ch : helis) {
         // found the whole thing, just return the needed subset
         if (startTime >= ch.t1 && endTime <= ch.t2) {
@@ -529,10 +533,23 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
 
         // if cached data found
         if (hd2 != null) {
-          hd.concatenate(hd2);
+          final DoubleMatrix2D part = hd2.getData();
+          final int partColumns = part == null ? 0 : part.columns();
+          if (columns > 0 && partColumns > 0 && partColumns != columns) {
+            // compose rejects mixed widths; fail on the same piece concatenate did
+            hd.setData(stackRows(parts));
+            hd.concatenate(hd2);
+          }
+          if (partColumns > 0) {
+            columns = partColumns;
+          }
+          parts.add(part);
           ch.lastAccess = System.currentTimeMillis();
           hd2 = null;
         }
+      }
+      if (!parts.isEmpty()) {
+        hd.setData(stackRows(parts));
       }
       hd.sort();
       if (hd.getData() == null) {
@@ -541,6 +558,17 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
 
       return hd;
     }
+  }
+
+  /**
+   * Stack row blocks into one new matrix, the same matrix concatenating them in turn builds.
+   */
+  private static DoubleMatrix2D stackRows(final List<DoubleMatrix2D> parts) {
+    final DoubleMatrix2D[][] blocks = new DoubleMatrix2D[parts.size()][1];
+    for (int i = 0; i < blocks.length; i++) {
+      blocks[i][0] = parts.get(i);
+    }
+    return DoubleFactory2D.dense.compose(blocks);
   }
 
   /**
