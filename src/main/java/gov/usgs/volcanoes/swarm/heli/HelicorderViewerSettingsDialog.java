@@ -126,26 +126,8 @@ public class HelicorderViewerSettingsDialog extends SwarmModalDialog {
     setToCurrent();
   }
 
-  private void createComponents() {
-    int[] values = HelicorderViewerFrame.chunkValues;
-    String[] chunks = new String[values.length];
-    for (int i = 0; i < chunks.length; i++) {
-      chunks[i] = Integer.toString(values[i] / 60);
-    }
-    chunkList = new JComboBox<String>(chunks);
-
-    values = HelicorderViewerFrame.spanValues;
-    String[] spans = new String[values.length];
-    for (int i = 0; i < spans.length; i++) {
-      spans[i] = Integer.toString(values[i] / 60);
-    }
-
-    spanList = new JComboBox<String>(spans);
-  }
-
   protected void createUi() {
     super.createUi();
-    createComponents();
 
     // AXIS PANEL
     int[] values = HelicorderViewerFrame.chunkValues;
