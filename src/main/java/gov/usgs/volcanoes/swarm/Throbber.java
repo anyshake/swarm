@@ -87,6 +87,8 @@ public class Throbber extends JLabel implements Runnable {
    * @see java.lang.Runnable#run()
    */
   public void run() {
+    final long frameNs = (1000 / 8) * 1000000L;
+    long nextFrameNs = System.nanoTime() + frameNs;
     while (!quit) {
       try {
         synchronized (this) {
@@ -97,7 +99,20 @@ public class Throbber extends JLabel implements Runnable {
         if (quit) {
           break;
         }
-        Thread.sleep(1000 / 8);
+        long now = System.nanoTime();
+        if (nextFrameNs < now) {
+          long behind = now - nextFrameNs;
+          long steps = behind / frameNs;
+          nextFrameNs += steps * frameNs;
+          if (nextFrameNs < now) {
+            nextFrameNs += frameNs;
+          }
+        }
+        long remainNs = nextFrameNs - now;
+        if (remainNs > 0) {
+          Thread.sleep(remainNs / 1000000L, (int) (remainNs % 1000000L));
+        }
+        nextFrameNs += frameNs;
         if (onCount > 0) {
           setIcon(onIcons[cycle++ % 8]);
         }
