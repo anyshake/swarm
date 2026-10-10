@@ -47,6 +47,8 @@ public class RsamViewPanel extends JComponent implements SettingsListener {
   public static final long serialVersionUID = -1;
 
   private static final Color BACKGROUND_COLOR = new Color(0xf7, 0xf7, 0xf7);
+  private static final BasicStroke HAIRLINE = new BasicStroke(1.0f);
+  private static final BasicStroke TREND = new BasicStroke(2.0f);
 
   /**
    * X pixel location of where the main plot axis should be located on the component.
@@ -84,6 +86,11 @@ public class RsamViewPanel extends JComponent implements SettingsListener {
    */
   private BufferedImage image;
   private final transient Offscreen offscreen = new Offscreen();
+  private Plot plot;
+  private RSAMData countedData;
+  private int countedThreshold = Integer.MIN_VALUE;
+  private double countedRatio = Double.NaN;
+  private double countedMaxLength = Double.NaN;
 
   /**
    * Constructs a WaveViewPanel with default settings.
@@ -228,7 +235,11 @@ public class RsamViewPanel extends JComponent implements SettingsListener {
   private synchronized void constructPlot(Graphics2D g2) {
     Dimension dim = this.getSize();
 
-    Plot plot = new Plot();
+    if (plot == null) {
+      plot = new Plot();
+    } else {
+      plot.clear();
+    }
     plot.setBackgroundColor(BACKGROUND_COLOR);
     plot.setSize(dim);
 
@@ -283,8 +294,9 @@ public class RsamViewPanel extends JComponent implements SettingsListener {
     double max;
     double min;
     if (settings.autoScale) {
-      max = gdm.max(1) + gdm.max(1) * .1;
-      min = gdm.min(1) - gdm.max(1) * .1;
+      double peak = gdm.max(1);
+      max = peak + peak * .1;
+      min = gdm.min(1) - peak * .1;
     } else {
       max = settings.scaleMax;
       min = settings.scaleMin;
@@ -305,7 +317,7 @@ public class RsamViewPanel extends JComponent implements SettingsListener {
       // draw threshold line
       LineRenderer lr = new LineRenderer();
       lr.color = Color.RED;
-      lr.stroke = new BasicStroke(1.0f);
+      lr.stroke = HAIRLINE;
       double y = mr.getYPixel(settings.eventThreshold);
       lr.line = new Line2D.Double(X_OFFSET, y, this.getWidth() - RIGHT_WIDTH, y);
       plot.addRenderer(lr);
@@ -323,6 +335,23 @@ public class RsamViewPanel extends JComponent implements SettingsListener {
   }
 
   /**
+   * Count events once per data object and detection settings. countEvents replaces its histogram.
+   */
+  private void countEvents(RSAMData data) {
+    if (data == countedData && settings.eventThreshold == countedThreshold
+        && Double.doubleToLongBits(settings.eventRatio) == Double.doubleToLongBits(countedRatio)
+        && Double.doubleToLongBits(settings.eventMaxLengthS) == Double
+            .doubleToLongBits(countedMaxLength)) {
+      return;
+    }
+    data.countEvents(settings.eventThreshold, settings.eventRatio, settings.eventMaxLengthS);
+    countedData = data;
+    countedThreshold = settings.eventThreshold;
+    countedRatio = settings.eventRatio;
+    countedMaxLength = settings.eventMaxLengthS;
+  }
+
+  /**
    * Plots RSAM counts.
    * 
    * @param data the RSAM values to plot
@@ -333,7 +362,7 @@ public class RsamViewPanel extends JComponent implements SettingsListener {
     }
 
     // get the relevant information for this channel
-    data.countEvents(settings.eventThreshold, settings.eventRatio, settings.eventMaxLengthS);
+    countEvents(data);
 
     // setup the histogram renderer with this data
     HistogramRenderer hr = new HistogramRenderer(data.getCountsHistogram(settings.binSize));
@@ -363,7 +392,7 @@ public class RsamViewPanel extends JComponent implements SettingsListener {
       mr.createDefaultLineRenderers(Color.RED);
       ShapeRenderer[] r = mr.getLineRenderers();
       ((ShapeRenderer) r[0]).color = Color.RED;
-      ((ShapeRenderer) r[0]).stroke = new BasicStroke(2.0f);
+      ((ShapeRenderer) r[0]).stroke = TREND;
 
       // create the axis for the right hand side
       AxisRenderer ar = new AxisRenderer(mr);
