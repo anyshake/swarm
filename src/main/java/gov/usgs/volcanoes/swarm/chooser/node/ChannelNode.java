@@ -6,9 +6,12 @@
 package gov.usgs.volcanoes.swarm.chooser.node;
 
 import gov.usgs.volcanoes.core.time.J2kSec;
+import gov.usgs.volcanoes.core.time.Time;
 import gov.usgs.volcanoes.swarm.Icons;
 import gov.usgs.volcanoes.swarm.Metadata;
 import gov.usgs.volcanoes.swarm.SwarmConfig;
+import java.text.SimpleDateFormat;
+import java.util.Locale;
 import javax.swing.Icon;
 
 public class ChannelNode extends AbstractChooserNode {
@@ -16,6 +19,12 @@ public class ChannelNode extends AbstractChooserNode {
   public static final String TOOL_TIP_DATE_FORMAT = "MMM dd, yyyy";
 
   private static final long serialVersionUID = 1L;
+
+  /** Guards the shared tool tip date format, which is only rebuilt when the locale changes. */
+  private static final Object TOOL_TIP_LOCK = new Object();
+  private static SimpleDateFormat toolTipFormat;
+  private static Locale toolTipLocale;
+
   private String channel;
 
   public ChannelNode(String c) {
@@ -58,8 +67,29 @@ public class ChannelNode extends AbstractChooserNode {
     if (Double.isNaN(minTime) || Double.isNaN(maxTime)) {
       return "No data";
     } else {
-      return J2kSec.format(TOOL_TIP_DATE_FORMAT, minTime) + " - "
-          + J2kSec.format(TOOL_TIP_DATE_FORMAT, maxTime);
+      return formatToolTipRange(minTime, maxTime);
+    }
+  }
+
+  /**
+   * Format a time range for a tool tip. The text is the same as joining two calls to
+   * J2kSec.format(TOOL_TIP_DATE_FORMAT, t) with " - ", without building a new date format for each
+   * date of each rendered row.
+   *
+   * @param minTime start time in j2k
+   * @param maxTime end time in j2k
+   * @return the formatted range
+   */
+  public static String formatToolTipRange(double minTime, double maxTime) {
+    synchronized (TOOL_TIP_LOCK) {
+      Locale locale = Locale.getDefault(Locale.Category.FORMAT);
+      if (toolTipFormat == null || !locale.equals(toolTipLocale)) {
+        toolTipFormat = new SimpleDateFormat(TOOL_TIP_DATE_FORMAT, locale);
+        toolTipFormat.setTimeZone(Time.DEFAULT_TIME_ZONE);
+        toolTipLocale = locale;
+      }
+      return toolTipFormat.format(J2kSec.asDate(minTime)) + " - "
+          + toolTipFormat.format(J2kSec.asDate(maxTime));
     }
   }
 
