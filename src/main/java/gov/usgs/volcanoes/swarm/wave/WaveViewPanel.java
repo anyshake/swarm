@@ -1553,8 +1553,20 @@ public class WaveViewPanel extends JComponent {
     if (Double.compare(cursorMark, j2k) == 0) {
       return;
     }
+    // Repaint only when the old or new time would draw. NaN limits fail both
+    // comparisons, so they stay inside, matching paintCursor.
+    boolean draw = cursorInView(cursorMark) || cursorInView(j2k);
     cursorMark = j2k;
-    repaint();
+    if (draw) {
+      repaint();
+    }
+  }
+
+  private boolean cursorInView(double j2k) {
+    if (wave == null || wave.numSamples() < 1 || Double.isNaN(j2k) || translation == null) {
+      return false;
+    }
+    return !(j2k < startTime) && !(j2k > endTime);
   }
 
   private void paintCursor(Graphics2D g2) {
