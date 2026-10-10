@@ -71,6 +71,10 @@ public class LocalFileReader implements DataStructureConst, TimeConstants {
   }
 
   private final Calendar cal = Calendar.getInstance(TimeZone.getTimeZone(ZoneOffset.UTC));
+  /** Raw bits of the sample rate whose interval is already stored. */
+  private long intervalRateBits;
+  private double samplingIntervalMs;
+  private boolean intervalReady;
   private final int[] dataBuffer;
   private int dataBufferNumSamples;
   private long dataBufferStartTime;
@@ -99,7 +103,6 @@ public class LocalFileReader implements DataStructureConst, TimeConstants {
       long nextStartTime = 0L;
       int numSamples;
       double sampleRate = 0.0;
-      double samplingIntervalMs;
       long maxTimeDiff;
       long startTime;
 
@@ -131,7 +134,14 @@ public class LocalFileReader implements DataStructureConst, TimeConstants {
               continue;
             }
             sampleRate = dr.getSampleRate();
-            samplingIntervalMs = Math.pow(sampleRate, -1) * (double) MS_PER_SECOND;
+            long rateBits = Double.doubleToRawLongBits(sampleRate);
+            if (!intervalReady || rateBits != intervalRateBits) {
+              // Division is not bit-identical to pow(rate, -1), including signed zero and NaN
+              // payloads, so the power stays and only a repeated rate skips it.
+              samplingIntervalMs = Math.pow(sampleRate, -1) * (double) MS_PER_SECOND;
+              intervalRateBits = rateBits;
+              intervalReady = true;
+            }
             maxTimeDiff = Math.max((long) samplingIntervalMs, 1);
             for (Blockette blockette : dr.getBlockettes(1000)) {
               if (blockette instanceof Blockette1000) {

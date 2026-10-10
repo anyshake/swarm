@@ -29,6 +29,8 @@ import edu.sc.seis.seisFile.mseed.DataHeader;
 import edu.sc.seis.seisFile.mseed.DataRecord;
 
 public class LocalFileUtil implements DataStructureConst, SwarmConst {
+  /** Codec has no instance fields, so one instance decompresses the same bytes as a new one. */
+  private static final Codec CODEC = new Codec();
   private static final String[] DIR_CHOOSER_HIDE_LABEL_TEXTS;
   /** YYYYYMMDD parser */
   private static final DateTimeFormatter YYYYYMMDD_PARSER;
@@ -151,9 +153,8 @@ public class LocalFileUtil implements DataStructureConst, SwarmConst {
     final int type = b1000.getEncodingFormat();
     final byte[] data = dr.getData();
     final boolean swapNeeded = b1000.getWordOrder() == 0;
-    final Codec codec = new Codec();
     final DecompressedData decomp =
-        codec.decompress(type, data, dr.getHeader().getNumSamples(), swapNeeded);
+        CODEC.decompress(type, data, dr.getHeader().getNumSamples(), swapNeeded);
     return decomp.getAsInt();
   }
 

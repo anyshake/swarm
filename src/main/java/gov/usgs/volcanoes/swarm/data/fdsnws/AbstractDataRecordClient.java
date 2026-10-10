@@ -27,6 +27,8 @@ import gov.usgs.volcanoes.swarm.SwarmUtil;
 import gov.usgs.volcanoes.swarm.data.SeismicDataSource;
 
 public abstract class AbstractDataRecordClient {
+  /** Codec has no instance fields, so one instance decompresses the same bytes as a new one. */
+  private static final Codec CODEC = new Codec();
   /**
    * Add the waves.
    *
@@ -51,8 +53,8 @@ public abstract class AbstractDataRecordClient {
     final int type = b1000.getEncodingFormat();
     final byte[] data = dr.getData();
     final boolean swapNeeded = b1000.getWordOrder() == 0;
-    final Codec codec = new Codec();
-    final DecompressedData decomp = codec.decompress(type, data, dr.getHeader().getNumSamples(), swapNeeded);
+    final DecompressedData decomp =
+        CODEC.decompress(type, data, dr.getHeader().getNumSamples(), swapNeeded);
     final Wave wave = new Wave();
     wave.setSamplingRate(dr.getSampleRate());
     Btime btime = dh.getStartBtime();
@@ -64,8 +66,7 @@ public abstract class AbstractDataRecordClient {
     cal.set(Calendar.MINUTE, btime.getMin());
     cal.set(Calendar.SECOND, btime.getSec());
     cal.set(Calendar.MILLISECOND, btime.getTenthMilli() / 10);
-    Date date = cal.getTime();
-    double j2k = J2kSec.fromDate(date);
+    double j2k = J2kSec.fromEpoch(cal.getTimeInMillis());
     wave.setStartTime(j2k);
     wave.buffer = decomp.getAsInt();
     wave.register();
