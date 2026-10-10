@@ -572,18 +572,27 @@ public class MapFrame extends SwarmFrame implements Runnable, Kioskable, SwarmOp
    * @param t text
    */
   public void setStatusText(final String t) {
+    final String next = composeStatus(t);
+    if (next != null && next.equals(statusLabel.getText())) {
+      return;
+    }
     SwingUtilities.invokeLater(new Runnable() {
       public void run() {
-        String missing = "";
-        if (mapPanel.getMissing() == 1) {
-          missing = "(" + mapPanel.getMissing() + " channel hidden) ";
-        } else if (mapPanel.getMissing() > 1) {
-          missing = "(" + mapPanel.getMissing() + " channels hidden) ";
-        }
-        statusLabel.setText(missing + t);
+        statusLabel.setText(composeStatus(t));
         statusLabel.repaint();
       }
     });
+  }
+
+  private String composeStatus(final String t) {
+    final int missingCount = mapPanel.getMissing();
+    if (missingCount == 1) {
+      return "(" + missingCount + " channel hidden) " + t;
+    }
+    if (missingCount > 1) {
+      return "(" + missingCount + " channels hidden) " + t;
+    }
+    return t;
   }
 
   public void reloadImages() {
