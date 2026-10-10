@@ -20,9 +20,11 @@ import gov.usgs.volcanoes.swarm.map.MapPanel;
 import gov.usgs.volcanoes.swarm.map.MapPanel.ColorSetting;
 import java.awt.BasicStroke;
 import java.awt.Color;
+import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.Rectangle;
+import java.awt.RenderingHints;
 import java.awt.event.MouseEvent;
 import java.awt.geom.Ellipse2D;
 import java.awt.geom.Point2D;
@@ -35,6 +37,7 @@ import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
@@ -76,6 +79,19 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
   private int placedWidth = Integer.MIN_VALUE;
   private int placedHeight = Integer.MIN_VALUE;
   private int placedInset = Integer.MIN_VALUE;
+  private Event popupEvent;
+  private long popupOriginTime = Long.MIN_VALUE;
+  private boolean popupHasMagnitude;
+  private long popupMagnitudeBits;
+  private String popupMagnitudeType;
+  private long popupDepthBits;
+  private String popupDescription;
+  private Font popupFont;
+  private Object popupAntialias;
+  private final List<String> popupLines = new ArrayList<String>(3);
+  private int[] popupLineSpan = new int[4];
+  private int popupWidth;
+  private int popupHeight;
 
   private final Map<String, Event> events;
   private final Map<String, Event> importedEvents;
@@ -269,16 +285,7 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
     Origin origin = hoverEvent.getPreferredOrigin();
     GeoRange range = panel.getRange();
     Projection projection = panel.getProjection();
-    List<String> text = generatePopupText(origin);
-
-    FontMetrics fm = g2.getFontMetrics();
-    int popupHeight = 2 * POPUP_PADDING;
-    int popupWidth = 0;
-    for (String string : text) {
-      Rectangle2D bounds = fm.getStringBounds(string, g2);
-      popupHeight += (int) (Math.ceil(bounds.getHeight()) + 2);
-      popupWidth = Math.max(popupWidth, (int) (Math.ceil(bounds.getWidth()) + 2 * POPUP_PADDING));
-    }
+    ensurePopup(origin, g2);
 
     int widthPx = panel.getGraphWidth();
     int heightPx = panel.getGraphHeight();
@@ -304,34 +311,69 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
 
     g2.setColor(Color.WHITE);
     int baseY = POPUP_PADDING;
-    for (String string : text) {
-      g2.drawString(string, POPUP_PADDING, -baseY);
-      Rectangle2D bounds = fm.getStringBounds(string, g2);
-      baseY += (int) (Math.ceil(bounds.getHeight()) + 2);
+    for (int i = 0; i < popupLines.size(); i++) {
+      g2.drawString(popupLines.get(i), POPUP_PADDING, -baseY);
+      baseY += popupLineSpan[i];
     }
     g2.translate(-eventPixel.x, -eventPixel.y);
 
   }
 
-  private List<String> generatePopupText(Origin origin) {
-    List<String> text = new ArrayList<String>(3);
-
-    Magnitude magElement = hoverEvent.getPreferredMagnitude();
-    if (magElement != null) {
-      String mag = String.format("%.2f %s at %.2f km depth", magElement.getMagnitude().getValue(),
-          magElement.getType(), (origin.getDepth() / 1000));
-      text.add(mag);
+  /**
+   * Build the hover popup once per event. Later paints reuse the same strings and measured spans.
+   */
+  private void ensurePopup(final Origin origin, final Graphics2D g2) {
+    final Font font = g2.getFont();
+    final Object antialias = g2.getRenderingHint(RenderingHints.KEY_ANTIALIASING);
+    final Magnitude magnitude = hoverEvent.getPreferredMagnitude();
+    final boolean hasMagnitude = magnitude != null;
+    final long magnitudeBits =
+        hasMagnitude ? Double.doubleToLongBits(magnitude.getMagnitude().getValue()) : 0L;
+    final String magnitudeType = hasMagnitude ? magnitude.getType() : null;
+    final long depthBits = Double.doubleToLongBits(origin.getDepth());
+    final long originTime = origin.getTime();
+    final String description = hoverEvent.getDescription();
+    if (hoverEvent == popupEvent && originTime == popupOriginTime && font == popupFont
+        && antialias == popupAntialias && hasMagnitude == popupHasMagnitude
+        && magnitudeBits == popupMagnitudeBits && Objects.equals(magnitudeType, popupMagnitudeType)
+        && depthBits == popupDepthBits && Objects.equals(description, popupDescription)) {
+      return;
     }
+    popupEvent = hoverEvent;
+    popupOriginTime = originTime;
+    popupFont = font;
+    popupAntialias = antialias;
+    popupHasMagnitude = hasMagnitude;
+    popupMagnitudeBits = magnitudeBits;
+    popupMagnitudeType = magnitudeType;
+    popupDepthBits = depthBits;
+    popupDescription = description;
 
-    String date = Time.format(Time.STANDARD_TIME_FORMAT, new Date(origin.getTime()));
-    text.add(date + " UTC");
-
-    String description = hoverEvent.getDescription();
+    popupLines.clear();
+    if (hasMagnitude) {
+      final String mag = String.format("%.2f %s at %.2f km depth",
+          magnitude.getMagnitude().getValue(), magnitude.getType(), (origin.getDepth() / 1000));
+      popupLines.add(mag);
+    }
+    final String date = Time.format(Time.STANDARD_TIME_FORMAT, new Date(origin.getTime()));
+    popupLines.add(date + " UTC");
     if (description != null && !description.equals("")) {
-      text.add(description);
+      popupLines.add(description);
     }
 
-    return text;
+    if (popupLineSpan.length < popupLines.size()) {
+      popupLineSpan = new int[popupLines.size()];
+    }
+    final FontMetrics fm = g2.getFontMetrics();
+    popupHeight = 2 * POPUP_PADDING;
+    popupWidth = 0;
+    for (int i = 0; i < popupLines.size(); i++) {
+      final Rectangle2D bounds = fm.getStringBounds(popupLines.get(i), g2);
+      final int span = (int) (Math.ceil(bounds.getHeight()) + 2);
+      popupLineSpan[i] = span;
+      popupHeight += span;
+      popupWidth = Math.max(popupWidth, (int) (Math.ceil(bounds.getWidth()) + 2 * POPUP_PADDING));
+    }
   }
 
   /**
