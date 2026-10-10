@@ -1083,6 +1083,7 @@ public class MapPanel extends JPanel {
     private Color mapLinePaint;
     private int cachedLineWidth = Integer.MIN_VALUE;
     private int cachedLineColor;
+    private final GeneralPath rulerPath = new GeneralPath();
 
     private void applyMapLineStyle(final Graphics2D g2) {
       int width = swarmConfig.mapLineWidth;
@@ -1105,7 +1106,8 @@ public class MapPanel extends JPanel {
       final double d = Projection.distanceBetweenM(origin, lonLat);
       final int n = 720;
       final Point2D.Double[] pts = Projection.getPointsFrom(origin, d, n);
-      final GeneralPath gp = new GeneralPath();
+      final GeneralPath gp = rulerPath;
+      gp.reset();
       Point2D.Double xy = getXy(pts[0].x, pts[0].y);
       int lastX = (int) Math.round(xy.x);
       int lastY = (int) Math.round(xy.y);
@@ -1131,7 +1133,8 @@ public class MapPanel extends JPanel {
     private void paintGreatCircleRoute(final Graphics2D g2) {
       final Point2D.Double lonLat = getLonLat(mouseNow.x, mouseNow.y);
       Point2D.Double origin = getLonLat(mouseDown.x, mouseDown.y);
-      final GeneralPath gp = new GeneralPath();
+      final GeneralPath gp = rulerPath;
+      gp.reset();
       Point2D.Double xy = getXy(origin.x, origin.y);
       int lastX = (int) Math.round(xy.x);
       int lastY = (int) Math.round(xy.y);
@@ -1182,16 +1185,16 @@ public class MapPanel extends JPanel {
         }
 
         g.setXORMode(Color.WHITE);
-        if (lines != null) {
+        if (lines != null && !lines.isEmpty()) {
+          final Stroke savedStroke = g2.getStroke();
+          final Color savedColor = g2.getColor();
+          g2.setPaintMode();
+          applyMapLineStyle(g2);
           for (final Line2D.Double line : lines) {
-            final Stroke s = g2.getStroke();
-            final Color c = g2.getColor();
-            g2.setPaintMode();
-            applyMapLineStyle(g2);
             g2.draw(line);
-            g2.setStroke(s);
-            g2.setColor(c);
           }
+          g2.setStroke(savedStroke);
+          g2.setColor(savedColor);
         }
         g.setPaintMode();
 

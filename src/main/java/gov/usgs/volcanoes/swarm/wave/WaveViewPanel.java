@@ -128,6 +128,19 @@ public class WaveViewPanel extends JComponent {
   protected static final Color DARK_RED = new Color(168, 0, 0);
   protected static final Color DARK_GREEN = new Color(0, 168, 0);
   private static final Color DRAG_HIGHLIGHT = new Color(255, 255, 0, 128);
+  private static final String[] PICK_PHASES = {PickData.P, PickData.S};
+  private static final String[] CODA_PHASES = {PickData.CODA1, PickData.CODA2};
+  private static final Color UNCERTAINTY_GRAY = halfAlpha(Color.GRAY);
+  private static final Color UNCERTAINTY_P = halfAlpha(PickWavePanel.P_BACKGROUND);
+  private static final Color UNCERTAINTY_S = halfAlpha(PickWavePanel.S_BACKGROUND);
+  private static final Color UNCERTAINTY_CODA = halfAlpha(Color.YELLOW);
+  private final Line2D.Double overlayLine = new Line2D.Double();
+  private final GeneralPath markPath = new GeneralPath();
+
+  /** Same RGB with alpha divided by two, matching the previous per-paint constructor. */
+  private static Color halfAlpha(Color color) {
+    return new Color(color.getRed(), color.getGreen(), color.getBlue(), color.getAlpha() / 2);
+  }
 
   protected boolean pauseCursorMark;
   protected double time;
@@ -840,12 +853,12 @@ public class WaveViewPanel extends JComponent {
         return;
       }
       if (!pickData.isHidePhases()) {
-        for (String phase : new String[] { PickData.P, PickData.S }) {
+        for (String phase : PICK_PHASES) {
           drawPick(pickData.getPick(phase), g2, !pickData.isPickChannel(phase));
         }
       }
       if (!pickData.isHideCoda()) {
-        for (String coda : new String[] { PickData.CODA1, PickData.CODA2 }) {
+        for (String coda : CODA_PHASES) {
           drawPick(pickData.getPick(coda), g2, false);
         }
       }
@@ -931,17 +944,18 @@ public class WaveViewPanel extends JComponent {
 
     double x = (j2k - t[1]) / t[0];
     g2.setColor(DARK_GREEN);
-    g2.draw(new Line2D.Double(x, yOffset, x, getHeight() - bottomHeight - 1));
+    overlayLine.setLine(x, yOffset, x, getHeight() - bottomHeight - 1);
+    g2.draw(overlayLine);
 
-    GeneralPath gp = new GeneralPath();
-    gp.moveTo((float) x, yOffset);
-    gp.lineTo((float) x - 5, yOffset - 7);
-    gp.lineTo((float) x + 5, yOffset - 7);
-    gp.closePath();
+    markPath.reset();
+    markPath.moveTo((float) x, yOffset);
+    markPath.lineTo((float) x - 5, yOffset - 7);
+    markPath.lineTo((float) x + 5, yOffset - 7);
+    markPath.closePath();
     g2.setPaint(Color.GREEN);
-    g2.fill(gp);
+    g2.fill(markPath);
     g2.setColor(DARK_GREEN);
-    g2.draw(gp);
+    g2.draw(markPath);
   }
 
   /**
@@ -962,25 +976,28 @@ public class WaveViewPanel extends JComponent {
     double x = (j2k - t[1]) / t[0];
     // draw line
     g2.setColor(PickWavePanel.DARK_GREEN);
-    g2.draw(new Line2D.Double(x, yOffset, x, getHeight() - bottomHeight - 1));
+    overlayLine.setLine(x, yOffset, x, getHeight() - bottomHeight - 1);
+    g2.draw(overlayLine);
 
     // get color
     String tag = pick.getTag();
     Color color = Color.GRAY;
+    Color uncertaintyShade = UNCERTAINTY_GRAY;
     if (tag.indexOf('P') != -1) {
       color = PickWavePanel.P_BACKGROUND;
+      uncertaintyShade = UNCERTAINTY_P;
     } else if (tag.indexOf('S') != -1) {
       color = PickWavePanel.S_BACKGROUND;
+      uncertaintyShade = UNCERTAINTY_S;
     } else if (tag.indexOf('C') != -1) {
       color = Color.YELLOW;
+      uncertaintyShade = UNCERTAINTY_CODA;
     }
     g2.setColor(color);
 
     // draw uncertainty
     double uncertainty = pick.getTimeQuantity().getUncertainty();
     if (!Double.isNaN(uncertainty)) {
-      Color uncertaintyShade =
-          new Color(color.getRed(), color.getGreen(), color.getBlue(), color.getAlpha() / 2);
       g2.setColor(uncertaintyShade);
       // lowerUncertainty
       long lowTime = (long) (pick.getTime() - 1000.0 * uncertainty);
@@ -1034,7 +1051,8 @@ public class WaveViewPanel extends JComponent {
 
     // draw line
     g2.setColor(PickWavePanel.DARK_GREEN);
-    g2.draw(new Line2D.Double(x, yOffset, x, getHeight() - bottomHeight - 1));
+    overlayLine.setLine(x, yOffset, x, getHeight() - bottomHeight - 1);
+    g2.draw(overlayLine);
 
     // get color
     Color color = Color.GRAY;
@@ -1490,7 +1508,8 @@ public class WaveViewPanel extends JComponent {
     }
     double x = (cursorMark - t[1]) / t[0];
     g2.setColor(DARK_RED);
-    g2.draw(new Line2D.Double(x, yOffset + 1, x, getHeight() - bottomHeight - 1));
+    overlayLine.setLine(x, yOffset + 1, x, getHeight() - bottomHeight - 1);
+    g2.draw(overlayLine);
   }
 
 
