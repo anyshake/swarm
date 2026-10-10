@@ -33,6 +33,8 @@ public class DataSelectReader extends StringMSeedQueryReader {
   /** The default web services URL. */
   public static final String DEFAULT_WS_URL = "http://service.iris.edu/fdsnws/dataselect/1/query";
   private static final Logger LOGGER = LoggerFactory.getLogger(DataSelectReader.class);
+  private final SimpleDateFormat queryDateFormat = gmtQueryFormat();
+
   /** The timeout in milliseconds. */
   protected int timeoutMillis;
   /** The URL base. */
@@ -109,11 +111,17 @@ public class DataSelectReader extends StringMSeedQueryReader {
   public String createQuery(String network, String station, String location, String channel, Date begin, Date end) {
     String query;
     query = createQuery(network, station, location, channel);
-    SimpleDateFormat longFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
-    longFormat.setTimeZone(TimeZone.getTimeZone("GMT"));
-    query += "&start=" + longFormat.format(begin);
-    query += "&end=" + longFormat.format(end);
+    synchronized (queryDateFormat) {
+      query += "&start=" + queryDateFormat.format(begin);
+      query += "&end=" + queryDateFormat.format(end);
+    }
     return query;
+  }
+
+  private static SimpleDateFormat gmtQueryFormat() {
+    SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
+    format.setTimeZone(TimeZone.getTimeZone("GMT"));
+    return format;
   }
 
   /**

@@ -90,6 +90,25 @@ public class MultiMonitor extends SwarmFrame implements Kioskable {
   private int selectedIndex = -1;
 
   private static final Color SELECT_COLOR = new Color(204, 204, 255);
+  private static final Color STRIPE = new Color(230, 230, 230);
+  private static final Color LABEL_BACK = new Color(255, 255, 255, 210);
+  private static final int FONT_CACHE = 40;
+  private static final Font[] BOLD_FONTS = new Font[FONT_CACHE];
+  private static final Font[] PLAIN_FONTS = new Font[FONT_CACHE];
+
+  private static Font dialogFont(final Font[] cache, final String style, final int size) {
+    if (size < 1 || size >= cache.length) {
+      return Font.decode("dialog-" + style + "-" + size);
+    }
+    synchronized (cache) {
+      Font cached = cache[size];
+      if (cached == null) {
+        cached = Font.decode("dialog-" + style + "-" + size);
+        cache[size] = cached;
+      }
+      return cached;
+    }
+  }
 
   private Throbber throbber;
 
@@ -461,7 +480,7 @@ public class MultiMonitor extends SwarmFrame implements Kioskable {
         final double start = times[0];
 
         String tf = J2kSec.format("HH:mm:ss", now);
-        final Font font = Font.decode("dialog-BOLD-" + (bottomLabelHeight - 2));
+        final Font font = dialogFont(BOLD_FONTS, "BOLD", bottomLabelHeight - 2);
         g.setFont(font);
         final FontMetrics fm = g.getFontMetrics();
         // System.out.println(insets.bottom);
@@ -548,7 +567,7 @@ public class MultiMonitor extends SwarmFrame implements Kioskable {
       rr.rect.width += 5;
       rr.rect.y = 3;
       rr.color = Color.GRAY;
-      rr.backgroundColor = new Color(255, 255, 255, 210);
+      rr.backgroundColor = LABEL_BACK;
 
       final int hTicks = fr.getGraphWidth() / 108;
       final Object[] stt = SmartTick.autoTimeTick(fr.getMinXAxis(), fr.getMaxXAxis(), hTicks);
@@ -576,7 +595,7 @@ public class MultiMonitor extends SwarmFrame implements Kioskable {
         final TextRenderer tr =
             new TextRenderer(fr.getGraphX() + 2, fr.getGraphY() + fr.getGraphHeight() - 2, range);
         final int fs = Math.min(10, labelFontSize);
-        tr.font = Font.decode("dialog-PLAIN-" + fs);
+        tr.font = dialogFont(PLAIN_FONTS, "PLAIN", fs);
         tr.color = Color.BLACK;
         ar.addPostRenderer(tr);
       }
@@ -673,7 +692,7 @@ public class MultiMonitor extends SwarmFrame implements Kioskable {
     if (i % 2 != 0) {
       wvp.setBackgroundColor(Color.WHITE);
     } else {
-      wvp.setBackgroundColor(new Color(230, 230, 230));
+      wvp.setBackgroundColor(STRIPE);
     }
   }
 
@@ -715,7 +734,7 @@ public class MultiMonitor extends SwarmFrame implements Kioskable {
     labelFontSize = Math.min(36, wh / 3);
     boolean done = false;
     while (!done) {
-      font = Font.decode("dialog-BOLD-" + labelFontSize);
+      font = dialogFont(BOLD_FONTS, "BOLD", labelFontSize);
       final Rectangle2D r = font.getStringBounds("XXXX XX XXX", frc);
       if ((r.getWidth() / ww < 0.25) || labelFontSize <= 8) {
         done = true;

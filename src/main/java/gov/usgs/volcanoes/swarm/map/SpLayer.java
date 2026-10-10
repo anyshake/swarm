@@ -32,6 +32,9 @@ public class SpLayer implements MapLayer {
   private static final BasicStroke solid =
       new BasicStroke(1.0f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER);
 
+  private Color lineColor;
+  private int cachedLineColor = Integer.MIN_VALUE;
+
   /**
    * Constructor.
    */
@@ -71,7 +74,12 @@ public class SpLayer implements MapLayer {
     Color color = g2.getColor();
     Stroke stroke = g2.getStroke();
     Shape clip = g2.getClip();
-    g2.setColor(new Color(SwarmConfig.getInstance().mapLineColor));
+    int rgb = SwarmConfig.getInstance().mapLineColor;
+    if (lineColor == null || rgb != cachedLineColor) {
+      lineColor = new Color(rgb);
+      cachedLineColor = rgb;
+    }
+    g2.setColor(lineColor);
 
     // First get updated list of S-P
     Vector<Sp> spList = updateSpList();

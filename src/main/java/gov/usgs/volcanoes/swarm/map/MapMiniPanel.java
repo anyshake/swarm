@@ -60,6 +60,8 @@ public class MapMiniPanel extends JComponent
   private int labelHeight = 13;
   private int labelFontSize = 10;
   private int timeFontSize = 10;
+  private Font boldLabelFont;
+  private int boldLabelSize = -1;
   private static final int[] SIZES =
       new int[] { 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700 };
   private int sizeIndex = 3;
@@ -543,11 +545,19 @@ public class MapMiniPanel extends JComponent
 
     super.paint(g);
 
-    Font font = Font.decode("dialog-BOLD-" + labelFontSize);
+    Font font = boldLabelFont();
     g2.setFont(font);
     g2.setColor(Color.BLACK);
     g2.drawString(label, 2, labelFontSize);
     g2.drawRect(0, 0, getWidth() - 1, getHeight() - 1);
+  }
+
+  private Font boldLabelFont() {
+    if (boldLabelFont == null || boldLabelSize != labelFontSize) {
+      boldLabelFont = Font.decode("dialog-BOLD-" + labelFontSize);
+      boldLabelSize = labelFontSize;
+    }
+    return boldLabelFont;
   }
 
   protected void determineSelection(MouseEvent e) {
@@ -705,6 +715,7 @@ public class MapMiniPanel extends JComponent
   // TODO: could be singleton to reduce garbage
   private class MapWaveDecorator extends FrameDecorator {
     private Font font;
+    private int plainSize = -1;
     private FontRenderContext frc = new FontRenderContext(new AffineTransform(), false, false);
 
     public MapWaveDecorator() {}
@@ -842,7 +853,10 @@ public class MapMiniPanel extends JComponent
     }
 
     public void decorate(FrameRenderer fr) {
-      font = Font.decode("dialog-PLAIN-" + timeFontSize);
+      if (font == null || plainSize != timeFontSize) {
+        font = Font.decode("dialog-PLAIN-" + timeFontSize);
+        plainSize = timeFontSize;
+      }
       switch (wavePanel.getSettings().viewType) {
         case WAVE:
           decorateWave(fr);

@@ -206,14 +206,16 @@ public class SeedLinkClient implements Runnable, SwarmConst, TimeConstants {
 
   /*
    * taken from Robert Casey's PDCC seed code.
+   * rate = |factor|^sign(factor) * |multiplier|^sign(multiplier), which is the value itself
+   * when positive and its reciprocal when negative.
    */
-  private float getSampleRate(double factor, double multiplier) {
-    float sampleRate = (float) 10000.0; // default (impossible) value;
-    if ((factor * multiplier) != 0.0) { // in the case of log records
-      sampleRate = (float) (Math.pow(Math.abs(factor), (factor / Math.abs(factor)))
-          * Math.pow(Math.abs(multiplier), (multiplier / Math.abs(multiplier))));
+  private static float getSampleRate(double factor, double multiplier) {
+    if (factor == 0.0 || multiplier == 0.0) {
+      return 10000.0f;
     }
-    return sampleRate;
+    double rate = (factor > 0.0 ? factor : 1.0 / -factor)
+        * (multiplier > 0.0 ? multiplier : 1.0 / -multiplier);
+    return (float) rate;
   }
 
   /**
@@ -225,8 +227,16 @@ public class SeedLinkClient implements Runnable, SwarmConst, TimeConstants {
     return startTime;
   }
 
-  private Date btimeToDate(Btime btime) {
-    Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("GMT"));
+  private static final ThreadLocal<Calendar> GMT_CALENDAR = new ThreadLocal<Calendar>() {
+    @Override
+    protected Calendar initialValue() {
+      return Calendar.getInstance(TimeZone.getTimeZone("GMT"));
+    }
+  };
+
+  private static Date btimeToDate(Btime btime) {
+    Calendar cal = GMT_CALENDAR.get();
+    cal.clear();
     cal.set(Calendar.YEAR, btime.getYear());
     cal.set(Calendar.DAY_OF_YEAR, btime.getDayOfYear());
     cal.set(Calendar.HOUR_OF_DAY, btime.getHour());
@@ -295,14 +305,6 @@ public class SeedLinkClient implements Runnable, SwarmConst, TimeConstants {
    * 
    */
   private boolean packetHandler(int count, SLPacket slpack) throws Exception {
-
-    if (count % 10000 == 0) {
-      Runtime.getRuntime().gc();
-      LOGGER.trace(
-          "SeedLinkClient Packet count reached limit of 10000, garbage collection performed: {}",
-          this);
-    }
-
     // may not be on AWT-Event Thread, so do not call any GUI methods
 
     // check if not a complete packet

@@ -486,7 +486,7 @@ public class SwarmConfig {
   }
 
   public double getDurationMagnitude(final double t) {
-    return durationA * (Math.log(t) / Math.log(10)) + durationB;
+    return durationA * Math.log10(t) + durationB;
   }
 
   /**

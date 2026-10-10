@@ -127,6 +127,7 @@ public class WaveViewPanel extends JComponent {
   protected Color borderColor;
   protected static final Color DARK_RED = new Color(168, 0, 0);
   protected static final Color DARK_GREEN = new Color(0, 168, 0);
+  private static final Color DRAG_HIGHLIGHT = new Color(255, 255, 0, 128);
 
   protected boolean pauseCursorMark;
   protected double time;
@@ -658,8 +659,8 @@ public class WaveViewPanel extends JComponent {
         double spDuration = pickData.getSpDuration();
         if (!Double.isNaN(spDuration)) {
           double vp = SwarmConfig.getInstance().pVelocity;
-          double vs = vp / SwarmConfig.getInstance().velocityRatio;
-          double spDistance = spDuration * (vp * vs) / (vp - vs);
+          double ratio = SwarmConfig.getInstance().velocityRatio;
+          double spDistance = vp == 0.0 ? Double.NaN : spDuration * vp / (ratio - 1.0);
           pickStatus = String.format("S-P: %.2fs (%.2fkm)", spDuration, spDistance);
         }
         // Coda
@@ -694,7 +695,7 @@ public class WaveViewPanel extends JComponent {
             pickStatus += coda + ", " + avgCoda;
           }
         }
-        if (!pickStatus.equals(new String(""))) {
+        if (!pickStatus.isEmpty()) {
           status.append("\n");
           status.append(pickStatus);
         }
@@ -714,7 +715,7 @@ public class WaveViewPanel extends JComponent {
       });
     }
 
-    return !status.toString().equals(new String(" "));
+    return !status.toString().equals(" ");
   }
 
   /**
@@ -765,21 +766,15 @@ public class WaveViewPanel extends JComponent {
     if (settings.viewType == ViewType.SPECTRA) {
       settings.autoScaleSpectraPower = false;
       double maxf = settings.spectraMaxFreq * pct;
-      System.out.printf("WaveViewPanel(804): maxf = %f\n", maxf);
       settings.spectraMaxFreq =
           (maxf > wave.getSamplingRate() / 2) ? wave.getSamplingRate() / 2 : maxf;
-      System.out.printf("WaveViewPanel(806): settings.spectraMaxFreq = %f\n",
-          settings.spectraMaxFreq);
     }
     
     if (settings.viewType == ViewType.SPECTROGRAM) {
       settings.autoScaleSpectrogramPower = false;
       double maxf = settings.spectrogramMaxFreq * pct;
-      System.out.printf("WaveViewPanel(804): maxf = %f\n", maxf);
       settings.spectrogramMaxFreq =
           (maxf > wave.getSamplingRate() / 2) ? wave.getSamplingRate() / 2 : maxf;
-      System.out.printf("WaveViewPanel(806): settings.spectrogramMaxFreq = %f\n",
-          settings.spectrogramMaxFreq);
     }
 
     processSettings();
@@ -1324,8 +1319,7 @@ public class WaveViewPanel extends JComponent {
     spectrogramRenderer.setMaxPower(settings.spectrogramMaxPower);
     spectrogramRenderer.setMinPower(settings.spectrogramMinPower);
 
-    spectrogramRenderer.setBinSize((int) Math.pow(2,
-        Math.ceil(Math.log(settings.binSize * wave.getSamplingRate()) / Math.log(2))));
+    spectrogramRenderer.setBinSize(ceilPowerOfTwo(settings.binSize * wave.getSamplingRate()));
 
     if (channel != null && displayTitle) {
       spectrogramRenderer.setTitle(channel);
@@ -1453,6 +1447,19 @@ public class WaveViewPanel extends JComponent {
   }
 
   /**
+   * Smallest power of two greater than or equal to the sample count. Values below 1 keep the
+   * previous log expression so a fractional bin still truncates the same way.
+   */
+  private static int ceilPowerOfTwo(double samples) {
+    if (!(samples >= 1.0) || samples > Integer.MAX_VALUE) {
+      return (int) Math.pow(2.0, Math.ceil(Math.log(samples) / Math.log(2.0)));
+    }
+    int rounded = (int) Math.ceil(samples);
+    int bin = Integer.highestOneBit(rounded);
+    return bin < rounded ? bin << 1 : bin;
+  }
+
+  /**
    * Paints the zoom drag box.
    * 
    * @param g2 the graphics context
@@ -1462,7 +1469,7 @@ public class WaveViewPanel extends JComponent {
     int x2 = Math.max(highlightX1, highlightX2);
     int width = x2 - x1 + 1;
     Paint pnt = g2.getPaint();
-    g2.setPaint(new Color(255, 255, 0, 128));
+    g2.setPaint(DRAG_HIGHLIGHT);
     g2.fillRect(x1, yOffset + 1, width, getSize().height - bottomHeight - yOffset);
     g2.setPaint(pnt);
   }
