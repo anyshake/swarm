@@ -126,6 +126,7 @@ public class WaveViewPanel extends JComponent {
    */
   protected BufferedImage image;
   private final transient Offscreen offscreen = new Offscreen();
+  private transient volatile Offscreen.Painter plotPainter;
   private Plot plot;
   protected double mark1 = Double.NaN;
   protected double mark2 = Double.NaN;
@@ -190,6 +191,11 @@ public class WaveViewPanel extends JComponent {
   private double filteredCorner1 = Double.NaN;
   private double filteredCorner2 = Double.NaN;
   private double filteredRate = Double.NaN;
+  private boolean filterTextValid;
+  private Object filterTextType;
+  private long filterCorner1Bits;
+  private long filterCorner2Bits;
+  private String filterText = "";
   /**
    * Cursor timestamps stay on this formatter. Mouse handling is on the event thread, so it is not
    * shared with another thread. A new one is built when the default locale changes.
@@ -1051,11 +1057,14 @@ public class WaveViewPanel extends JComponent {
    * Create image.
    */
   public void createImage() {
-    offscreen.render(this, new Offscreen.Painter() {
-      public void paint(Graphics2D graphics) {
-        constructPlot(graphics);
-      }
-    }, true);
+    if (plotPainter == null) {
+      plotPainter = new Offscreen.Painter() {
+        public void paint(Graphics2D graphics) {
+          constructPlot(graphics);
+        }
+      };
+    }
+    offscreen.render(this, plotPainter, true);
   }
 
   /**
@@ -1375,26 +1384,47 @@ public class WaveViewPanel extends JComponent {
    * @return text renderer
    */
   public TextRenderer getFilterLabel(int x, int y, int horizJustification, int vertJustification) {
-    String ft = "";
-    switch (settings.filter.getType()) {
-      case BANDPASS:
-        ft = "Band pass [" + settings.filter.getCorner1() + "-" + settings.filter.getCorner2()
-            + " Hz]";
-        break;
-      case HIGHPASS:
-        ft = "High pass [" + settings.filter.getCorner1() + " Hz]";
-        break;
-      case LOWPASS:
-        ft = "Low pass [" + settings.filter.getCorner1() + " Hz]";
-        break;
-      default:
-        break;
-    }
-    TextRenderer tr = new TextRenderer(x, y, ft);
+    TextRenderer tr = new TextRenderer(x, y, filterText());
     tr.horizJustification = horizJustification;
     tr.vertJustification = vertJustification;
     tr.color = Color.red;
     return tr;
+  }
+
+  /**
+   * Filter corner text. Map callers keep the renderer this method returns, so only the string is
+   * reused.
+   */
+  private String filterText() {
+    Object type = settings.filter.getType();
+    double corner1 = settings.filter.getCorner1();
+    double corner2 = settings.filter.getCorner2();
+    long corner1Bits = Double.doubleToLongBits(corner1);
+    long corner2Bits = Double.doubleToLongBits(corner2);
+    if (filterTextValid && filterTextType == type && filterCorner1Bits == corner1Bits
+        && filterCorner2Bits == corner2Bits) {
+      return filterText;
+    }
+    String ft = "";
+    switch (settings.filter.getType()) {
+      case BANDPASS:
+        ft = "Band pass [" + corner1 + "-" + corner2 + " Hz]";
+        break;
+      case HIGHPASS:
+        ft = "High pass [" + corner1 + " Hz]";
+        break;
+      case LOWPASS:
+        ft = "Low pass [" + corner1 + " Hz]";
+        break;
+      default:
+        break;
+    }
+    filterTextType = type;
+    filterCorner1Bits = corner1Bits;
+    filterCorner2Bits = corner2Bits;
+    filterText = ft;
+    filterTextValid = true;
+    return ft;
   }
 
   /**
@@ -1505,15 +1535,16 @@ public class WaveViewPanel extends JComponent {
     double maxY = (settings.waveMaxAmp - offset) / multiplier;
 
     if (settings.autoScaleAmp) {
-      double[] dr = new double[] { wv.min(), wv.max() };
+      double minSample = wv.min();
+      double maxSample = wv.max();
       if (settings.autoScaleAmpMemory) {
-        minY = Math.min(minAmp, dr[0] - bias);
-        maxY = Math.max(maxAmp, dr[1] - bias);
+        minY = Math.min(minAmp, minSample - bias);
+        maxY = Math.max(maxAmp, maxSample - bias);
         minAmp = Math.min(minY, minAmp);
         maxAmp = Math.max(maxY, maxAmp);
       } else {
-        minY = dr[0] - bias;
-        maxY = dr[1] - bias;
+        minY = minSample - bias;
+        maxY = maxSample - bias;
       }
     }
 
