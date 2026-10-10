@@ -499,9 +499,12 @@ public class SwarmMenu extends JMenuBar implements InternalFrameListener {
 
     about = new JMenuItem("About...");
     about.setMnemonic('A');
-    aboutDialog = new AboutDialog();
     about.addActionListener(new ActionListener() {
       public void actionPerformed(ActionEvent e) {
+        // built on first use; its HTML panes and background are slow to set up at startup
+        if (aboutDialog == null) {
+          aboutDialog = new AboutDialog();
+        }
         aboutDialog.update();
         aboutDialog.setVisible(true);
       }
