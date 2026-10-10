@@ -13,6 +13,7 @@ import gov.usgs.volcanoes.core.util.UiUtils;
 import gov.usgs.volcanoes.swarm.Icons;
 import gov.usgs.volcanoes.swarm.Kioskable;
 import gov.usgs.volcanoes.swarm.Metadata;
+import gov.usgs.volcanoes.swarm.Offscreen;
 import gov.usgs.volcanoes.swarm.SwarmConfig;
 import gov.usgs.volcanoes.swarm.SwarmFrame;
 import gov.usgs.volcanoes.swarm.SwarmUtil;
@@ -419,7 +420,7 @@ public class MultiMonitor extends SwarmFrame implements Kioskable {
 
     private synchronized void createImage() {
       if (getWidth() > 0 && getHeight() > 0) {
-        image = new BufferedImage(getWidth(), getHeight(), BufferedImage.TYPE_4BYTE_ABGR);
+        image = Offscreen.image(getWidth(), getHeight());
       }
     }
 
@@ -435,7 +436,12 @@ public class MultiMonitor extends SwarmFrame implements Kioskable {
         g.setColor(Color.black);
         g.drawString("Monitor empty.", dim.width / 2 - 40, dim.height / 2);
       } else {
-        super.paint(image.getGraphics());
+        final Graphics2D imageGraphics = image.createGraphics();
+        try {
+          super.paint(imageGraphics);
+        } finally {
+          imageGraphics.dispose();
+        }
         g.drawImage(image, 0, 0, null);
         g.setColor(Color.WHITE);
         final Insets insets = wavePanel.getInsets();

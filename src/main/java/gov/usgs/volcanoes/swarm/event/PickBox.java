@@ -14,6 +14,7 @@ import gov.usgs.volcanoes.core.util.UiUtils;
 import gov.usgs.volcanoes.quakeml.Arrival;
 import gov.usgs.volcanoes.quakeml.Pick;
 import gov.usgs.volcanoes.swarm.Metadata;
+import gov.usgs.volcanoes.swarm.Offscreen;
 import gov.usgs.volcanoes.swarm.Swarm;
 import gov.usgs.volcanoes.swarm.SwarmConfig;
 import gov.usgs.volcanoes.swarm.SwingWorker;
@@ -207,7 +208,7 @@ public class PickBox extends JPanel implements Scrollable, PickToolBarListener {
 
   private synchronized void createImage() {
     if (getWidth() > 0 && getHeight() > 0) {
-      image = new BufferedImage(getWidth(), getHeight(), BufferedImage.TYPE_4BYTE_ABGR);
+      image = Offscreen.image(getWidth(), getHeight());
     }
   }
 
@@ -216,7 +217,12 @@ public class PickBox extends JPanel implements Scrollable, PickToolBarListener {
     if (image == null) {
       createImage();
     }
-    super.paint(image.getGraphics());
+    final Graphics imageGraphics = image.createGraphics();
+    try {
+      super.paint(imageGraphics);
+    } finally {
+      imageGraphics.dispose();
+    }
     g.drawImage(image, 0, 0, null);
     g.setColor(Color.WHITE);
   }
@@ -347,11 +353,15 @@ public class PickBox extends JPanel implements Scrollable, PickToolBarListener {
 
     final BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_4BYTE_ABGR);
     final Graphics g = image.getGraphics();
-    for (final WaveViewPanel panel : panels) {
-      if (!panel.getVisibleRect().isEmpty()) {
-        panel.paint(g);
-        g.translate(0, panel.getHeight());
+    try {
+      for (final WaveViewPanel panel : panels) {
+        if (!panel.getVisibleRect().isEmpty()) {
+          panel.paint(g);
+          g.translate(0, panel.getHeight());
+        }
       }
+    } finally {
+      g.dispose();
     }
     try {
       final PngEncoderB png = new PngEncoderB(image, false, PngEncoder.FILTER_NONE, 7);

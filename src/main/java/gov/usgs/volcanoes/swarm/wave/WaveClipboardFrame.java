@@ -337,9 +337,13 @@ public class WaveClipboardFrame extends SwarmFrame {
 
       final BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_4BYTE_ABGR);
       final Graphics g = image.getGraphics();
-      for (final WaveViewPanel panel : waves) {
-        panel.paint(g);
-        g.translate(0, panel.getHeight());
+      try {
+        for (final WaveViewPanel panel : waves) {
+          panel.paint(g);
+          g.translate(0, panel.getHeight());
+        }
+      } finally {
+        g.dispose();
       }
       try {
         final PngEncoderB png = new PngEncoderB(image, false, PngEncoder.FILTER_NONE, 7);
