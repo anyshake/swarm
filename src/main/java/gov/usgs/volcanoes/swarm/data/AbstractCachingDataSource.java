@@ -10,6 +10,7 @@ import gov.usgs.volcanoes.core.data.RSAMData;
 import gov.usgs.volcanoes.core.data.Wave;
 import gov.usgs.volcanoes.swarm.Swarm;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -309,36 +310,46 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
     }
 
     final int seconds = (int) Math.ceil(wave.numSamples() * wave.getSamplingPeriod());
-    final DoubleMatrix2D data = DoubleFactory2D.dense.make(seconds, 3);
-    for (int i = 0; i < seconds; i++) {
-      data.setQuick(i, 1, Integer.MAX_VALUE);
-      data.setQuick(i, 2, Integer.MIN_VALUE);
-    }
+    final double[] times = new double[seconds];
+    final int[] minima = new int[seconds];
+    final int[] maxima = new int[seconds];
+    Arrays.fill(minima, Integer.MAX_VALUE);
+    Arrays.fill(maxima, Integer.MIN_VALUE);
 
     final long sPeriod = (long) (wave.getSamplingPeriod() * TO_USEC);
     final long startTime = (long) (wave.getStartTime() * TO_USEC);
-    for (int sampleIndex = 0; sampleIndex < wave.numSamples(); sampleIndex++) {
-      final long sampleTime = startTime + sampleIndex * sPeriod;
-      final int sample = wave.buffer[sampleIndex];
-
-      if (sample != Wave.NO_DATA) {
-        final int secondIndex = (int) ((sampleTime - startTime) / TO_USEC);
-        data.setQuick(secondIndex, 0, sampleTime / TO_USEC);
-        data.setQuick(secondIndex, 1, Math.min(data.getQuick(secondIndex, 1), sample));
-        data.setQuick(secondIndex, 2, Math.max(data.getQuick(secondIndex, 2), sample));
+    final int[] samples = wave.buffer;
+    final int sampleCount = wave.numSamples();
+    for (int sampleIndex = 0; sampleIndex < sampleCount; sampleIndex++) {
+      final int sample = samples[sampleIndex];
+      if (sample == Wave.NO_DATA) {
+        continue;
       }
-
+      final long sampleTime = startTime + sampleIndex * sPeriod;
+      final int secondIndex = (int) ((sampleTime - startTime) / TO_USEC);
+      times[secondIndex] = sampleTime / TO_USEC;
+      if (sample < minima[secondIndex]) {
+        minima[secondIndex] = sample;
+      }
+      if (sample > maxima[secondIndex]) {
+        maxima[secondIndex] = sample;
+      }
     }
 
+    boolean needsMean = false;
     for (int i = 0; i < seconds; i++) {
-      final double min = data.getQuick(i, 1);
-      if (min == Integer.MAX_VALUE) {
-        data.setQuick(i, 1, wave.mean());
+      if (minima[i] == Integer.MAX_VALUE || maxima[i] == Integer.MIN_VALUE) {
+        needsMean = true;
+        break;
       }
-      final double max = data.getQuick(i, 2);
-      if (max == Integer.MIN_VALUE) {
-        data.setQuick(i, 2, wave.mean());
-      }
+    }
+    final double mean = needsMean ? wave.mean() : 0;
+
+    final DoubleMatrix2D data = DoubleFactory2D.dense.make(seconds, 3);
+    for (int i = 0; i < seconds; i++) {
+      data.setQuick(i, 0, times[i]);
+      data.setQuick(i, 1, minima[i] == Integer.MAX_VALUE ? mean : minima[i]);
+      data.setQuick(i, 2, maxima[i] == Integer.MIN_VALUE ? mean : maxima[i]);
     }
 
     final HelicorderData hd = new HelicorderData();
