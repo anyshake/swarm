@@ -68,8 +68,7 @@ public class MapFrame extends SwarmFrame implements Runnable, Kioskable, SwarmOp
   private JButton optionsButton;
   private JButton labelButton;
   private JLabel statusLabel;
-  private String pendingStatusText;
-  private boolean statusUpdateQueued;
+  private final PendingStatus pendingStatus = new PendingStatus();
   private JToggleButton linkButton;
   private JToggleButton realtimeButton;
   private JButton compXButton;
@@ -575,30 +574,54 @@ public class MapFrame extends SwarmFrame implements Runnable, Kioskable, SwarmOp
    */
   public void setStatusText(final String t) {
     if (!SwingUtilities.isEventDispatchThread()) {
-      SwingUtilities.invokeLater(new Runnable() {
-        public void run() {
-          setStatusText(t);
-        }
-      });
+      // Record before posting. A later event-thread request can replace this text
+      // before the update runs, and that update must paint the replacement.
+      if (pendingStatus.recordBackground(t)) {
+        postStatusPaint();
+      }
       return;
     }
-    final String next = composeStatus(t);
-    final String shown = statusUpdateQueued ? pendingStatusText : statusLabel.getText();
-    if (next == null ? shown == null : next.equals(shown)) {
-      return;
+    if (recordEventStatus(t)) {
+      postStatusPaint();
     }
-    pendingStatusText = next;
-    if (statusUpdateQueued) {
-      return;
+  }
+
+  private boolean recordEventStatus(final String requested) {
+    synchronized (pendingStatus) {
+      final String next = composeStatus(requested);
+      final String shown;
+      if (pendingStatus.awaitingPaint()) {
+        shown = composeStatus(pendingStatus.requestedText());
+      } else {
+        shown = statusLabel.getText();
+      }
+      return pendingStatus.recordEvent(requested, next, shown);
     }
-    statusUpdateQueued = true;
+  }
+
+  private void postStatusPaint() {
     SwingUtilities.invokeLater(new Runnable() {
+      @Override
       public void run() {
-        statusUpdateQueued = false;
-        statusLabel.setText(pendingStatusText);
-        statusLabel.repaint();
+        paintPendingStatus();
       }
     });
+  }
+
+  private void paintPendingStatus() {
+    final String requested = pendingStatus.takeForPaint();
+    if (!pendingStatus.matches(requested)) {
+      if (pendingStatus.repostIfSuperseded(requested)) {
+        postStatusPaint();
+      }
+      return;
+    }
+    statusLabel.setText(composeStatus(requested));
+    statusLabel.repaint();
+    pendingStatus.markApplied(requested);
+    if (pendingStatus.repostIfSuperseded(requested)) {
+      postStatusPaint();
+    }
   }
 
   private String composeStatus(final String t) {
@@ -679,6 +702,80 @@ public class MapFrame extends SwarmFrame implements Runnable, Kioskable, SwarmOp
 
   public void optionsChanged() {
     reloadImages();
+  }
+
+  /**
+   * Latest map status request. The update paints whichever request is current when it runs.
+   */
+  static final class PendingStatus {
+    private String text;
+    /** True when a paint runnable has been posted and has not yet started. */
+    private boolean queued;
+    /** True when the label already shows the last request, or no request has been made. */
+    private boolean applied = true;
+
+    synchronized boolean recordBackground(final String requested) {
+      text = requested;
+      applied = false;
+      if (queued) {
+        return false;
+      }
+      queued = true;
+      return true;
+    }
+
+    synchronized boolean awaitingPaint() {
+      return queued || !applied;
+    }
+
+    synchronized String requestedText() {
+      return text;
+    }
+
+    synchronized boolean isQueued() {
+      return queued;
+    }
+
+    synchronized boolean recordEvent(final String requested, final String composed,
+        final String shown) {
+      if (same(composed, shown)) {
+        return false;
+      }
+      text = requested;
+      applied = false;
+      if (queued) {
+        return false;
+      }
+      queued = true;
+      return true;
+    }
+
+    synchronized String takeForPaint() {
+      queued = false;
+      return text;
+    }
+
+    synchronized boolean matches(final String requested) {
+      return same(text, requested);
+    }
+
+    synchronized void markApplied(final String requested) {
+      if (same(text, requested)) {
+        applied = true;
+      }
+    }
+
+    synchronized boolean repostIfSuperseded(final String requested) {
+      if (same(text, requested) || queued) {
+        return false;
+      }
+      queued = true;
+      return true;
+    }
+
+    private static boolean same(final String left, final String right) {
+      return left == null ? right == null : left.equals(right);
+    }
   }
 
   private static class MapFrameHolder {
