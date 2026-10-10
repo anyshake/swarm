@@ -211,8 +211,10 @@ public class SeedLinkSource extends SeismicDataSource {
    */
   public synchronized HelicorderData getHelicorder(String scnl, double t1, double t2,
       GulperListener gl) {
-    LOGGER.debug("SeedLinkSource getHelicorder: {} {} {}", scnl, J2kSec.toDateString(t1),
-        J2kSec.toDateString(t2));
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("SeedLinkSource getHelicorder: {} {} {}", scnl, J2kSec.toDateString(t1),
+          J2kSec.toDateString(t2));
+    }
     scnl = scnl.replace(" ", "$"); // just to be sure
     startRealtimeClient(scnl);
 
