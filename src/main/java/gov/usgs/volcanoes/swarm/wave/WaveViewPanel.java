@@ -43,6 +43,7 @@ import java.awt.Paint;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionListener;
+import java.awt.font.FontRenderContext;
 import java.awt.geom.GeneralPath;
 import java.awt.geom.Line2D;
 import java.awt.image.BufferedImage;
@@ -148,6 +149,12 @@ public class WaveViewPanel extends JComponent {
   private boolean labelAscentValid;
   private int cachedLabelAscent;
   private final HashMap<String, Integer> labelWidths = new HashMap<String, Integer>();
+  /**
+   * Context {@link Graphics2D#getFontMetrics()} measured with. It carries the fractional-metrics
+   * hint, text antialiasing (graphics antialiasing when text antialiasing is left at the default),
+   * and the transform.
+   */
+  private FontRenderContext labelMetricsContext;
 
   /** Same RGB with alpha divided by two, matching the previous per-paint constructor. */
   private static Color halfAlpha(Color color) {
@@ -1215,21 +1222,32 @@ public class WaveViewPanel extends JComponent {
   }
 
   /**
-   * Label width and ascent for the current font. Cursor repaints redraw the same tags, so the
-   * measurements stay with the font instead of being taken again.
+   * Label width and ascent for the current font and the context {@code FontMetrics} measures with.
+   * Cursor repaints redraw the same tags, so the measurements stay until the font or that context
+   * changes. Widths are not reused before a font is set.
    */
   private void ensureLabelMetrics(Graphics2D g2) {
     Font font = g2.getFont();
-    if (labelAscentValid && font == labelFont) {
+    FontRenderContext context = g2.getFontRenderContext();
+    if (font != null && labelAscentValid && font == labelFont
+        && context.equals(labelMetricsContext)) {
       return;
     }
     labelFont = font;
+    labelMetricsContext = context;
     labelWidths.clear();
+    if (font == null) {
+      labelAscentValid = false;
+      return;
+    }
     cachedLabelAscent = g2.getFontMetrics().getAscent();
     labelAscentValid = true;
   }
 
   private int labelWidth(Graphics2D g2, String text) {
+    if (g2.getFont() == null) {
+      return g2.getFontMetrics().stringWidth(text);
+    }
     ensureLabelMetrics(g2);
     Integer width = labelWidths.get(text);
     if (width == null) {
@@ -1240,6 +1258,9 @@ public class WaveViewPanel extends JComponent {
   }
 
   private int labelAscent(Graphics2D g2) {
+    if (g2.getFont() == null) {
+      return g2.getFontMetrics().getAscent();
+    }
     ensureLabelMetrics(g2);
     return cachedLabelAscent;
   }
