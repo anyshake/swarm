@@ -690,11 +690,13 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
   private synchronized <T extends CacheEntry> void removeEntryFromCache(final CacheEntry ce,
       final Map<String, List<T>> cache) {
     final List<T> cl = cache.get(ce.station);
-    if (cache == waveCache) {
+    // Identity check; the generic maps are not comparable with ==.
+    final Object cacheMap = cache;
+    if (cacheMap == waveCache) {
       waveBytes -= ce.getMemorySize();
-    } else if (cache == helicorderCache) {
+    } else if (cacheMap == helicorderCache) {
       heliBytes -= ce.getMemorySize();
-    } else if (cache == rsamCache) {
+    } else if (cacheMap == rsamCache) {
       rsamBytes -= ce.getMemorySize();
     }
     cl.remove(ce);
