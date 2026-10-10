@@ -146,6 +146,15 @@ public class WaveViewPanel extends JComponent {
   protected double time;
   private Wave waveInfoSource;
   private String waveInfoText;
+  private Wave filteredSource;
+  private Wave filteredWave;
+  private int[] filteredBuffer;
+  private boolean filteredZeroPhase;
+  private int filteredOrder = Integer.MIN_VALUE;
+  private Object filteredType;
+  private double filteredCorner1 = Double.NaN;
+  private double filteredCorner2 = Double.NaN;
+  private double filteredRate = Double.NaN;
 
   // pick and tag data
   private PickData pickData;
@@ -1152,12 +1161,7 @@ public class WaveViewPanel extends JComponent {
     }
     plot.setBackgroundColor(backgroundColor);
     plot.setSize(dim);
-    Wave renderWave = wave;
-
-    if (settings.filterOn) {
-      renderWave = new Wave(wave);
-      renderWave.filter(settings.filter, settings.zeroPhaseShift);
-    }
+    Wave renderWave = waveForRender();
     switch (settings.viewType) {
       case WAVE:
         plotWave(plot, renderWave);
@@ -1181,6 +1185,39 @@ public class WaveViewPanel extends JComponent {
       e.printStackTrace();
     }
 
+  }
+
+  /**
+   * Filtered copy of the current wave. Reused while the samples and filter settings are unchanged.
+   */
+  private Wave waveForRender() {
+    if (!settings.filterOn || wave == null) {
+      filteredWave = null;
+      filteredSource = null;
+      filteredBuffer = null;
+      return wave;
+    }
+    if (filteredWave == null || filteredSource != wave || filteredBuffer != wave.buffer
+        || filteredZeroPhase != settings.zeroPhaseShift
+        || filteredOrder != settings.filter.getOrder() || filteredType != settings.filter.getType()
+        || Double.doubleToLongBits(filteredCorner1) != Double
+            .doubleToLongBits(settings.filter.getCorner1())
+        || Double.doubleToLongBits(filteredCorner2) != Double
+            .doubleToLongBits(settings.filter.getCorner2())
+        || Double.doubleToLongBits(filteredRate) != Double
+            .doubleToLongBits(wave.getSamplingRate())) {
+      filteredWave = new Wave(wave);
+      filteredWave.filter(settings.filter, settings.zeroPhaseShift);
+      filteredSource = wave;
+      filteredBuffer = wave.buffer;
+      filteredZeroPhase = settings.zeroPhaseShift;
+      filteredOrder = settings.filter.getOrder();
+      filteredType = settings.filter.getType();
+      filteredCorner1 = settings.filter.getCorner1();
+      filteredCorner2 = settings.filter.getCorner2();
+      filteredRate = wave.getSamplingRate();
+    }
+    return filteredWave;
   }
 
   /**
