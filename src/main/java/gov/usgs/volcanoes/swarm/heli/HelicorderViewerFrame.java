@@ -898,14 +898,17 @@ public class HelicorderViewerFrame extends SwarmFrame implements Kioskable {
         }
 
         try {
-          final long now = System.currentTimeMillis();
-          final long sleepTime = Math.min(now - lastRefreshTime, refreshInterval * 1000);
-
-          if (refreshInterval > 0) {
-            Thread.sleep(sleepTime);
+          final long intervalMs = refreshInterval > 0 ? refreshInterval * 1000L : 30_000L;
+          final long elapsed = System.currentTimeMillis() - lastRefreshTime;
+          final long sleepMs;
+          if (refreshInterval <= 0 || elapsed > intervalMs) {
+            sleepMs = intervalMs;
+          } else if (elapsed < 0) {
+            sleepMs = intervalMs;
           } else {
-            Thread.sleep(30 * 1000);
+            sleepMs = 2 * intervalMs - elapsed;
           }
+          Thread.sleep(sleepMs);
         } catch (final Exception e) {
           //
         }
@@ -1013,32 +1016,36 @@ public class HelicorderViewerFrame extends SwarmFrame implements Kioskable {
           final BufferedImage image =
               new BufferedImage(width, height, BufferedImage.TYPE_4BYTE_ABGR);
           final Graphics g = image.getGraphics();
-          helicorderViewPanel.paint(g);
-          // draw label
-          if (includeChannel.isSelected()) {
-            Font oldFont = g.getFont();
-            g.setFont(Font.decode("Dialog-BOLD-40"));
-            String channel = settings.channel.replace('_', ' ');
+          try {
+            helicorderViewPanel.paint(g);
+            // draw label
+            if (includeChannel.isSelected()) {
+              Font oldFont = g.getFont();
+              g.setFont(Font.decode("Dialog-BOLD-40"));
+              String channel = settings.channel.replace('_', ' ');
 
-            FontMetrics fm = g.getFontMetrics();
-            Font font = g.getFont();
-            float s = font.getSize();
-            int swidth = fm.stringWidth(channel);
-            while ((swidth / (double) width > .5) && (--s > 1)) {
-              g.setFont(font.deriveFont(s));
-              fm = g.getFontMetrics();
-              swidth = fm.stringWidth(channel);
+              FontMetrics fm = g.getFontMetrics();
+              Font font = g.getFont();
+              float s = font.getSize();
+              int swidth = fm.stringWidth(channel);
+              while ((swidth / (double) width > .5) && (--s > 1)) {
+                g.setFont(font.deriveFont(s));
+                fm = g.getFontMetrics();
+                swidth = fm.stringWidth(channel);
+              }
+              height = fm.getAscent() + fm.getDescent();
+              int lw = swidth + 20;
+              g.setColor(new Color(255, 255, 255, 192));
+              g.fillRect(helicorderViewPanel.getX() + width / 2 - lw / 2, 3, lw, height);
+              g.setColor(Color.black);
+              g.drawRect(helicorderViewPanel.getX() + width / 2 - lw / 2, 3, lw, height);
+
+              g.drawString(channel, helicorderViewPanel.getX() + width / 2 - swidth / 2,
+                  height - fm.getDescent());
+              g.setFont(oldFont);
             }
-            height = fm.getAscent() + fm.getDescent();
-            int lw = swidth + 20;
-            g.setColor(new Color(255, 255, 255, 192));
-            g.fillRect(helicorderViewPanel.getX() + width / 2 - lw / 2, 3, lw, height);
-            g.setColor(Color.black);
-            g.drawRect(helicorderViewPanel.getX() + width / 2 - lw / 2, 3, lw, height);
-
-            g.drawString(channel, helicorderViewPanel.getX() + width / 2 - swidth / 2,
-                height - fm.getDescent());
-            g.setFont(oldFont);
+          } finally {
+            g.dispose();
           }
           try {
             final PngEncoderB png = new PngEncoderB(image, false, PngEncoder.FILTER_NONE, 7);

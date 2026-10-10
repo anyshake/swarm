@@ -4,13 +4,14 @@ import gov.usgs.volcanoes.swarm.data.CachedDataSource;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
-import java.awt.Graphics;
+import java.awt.Graphics2D;
 import java.awt.GridLayout;
-import java.awt.Image;
 import java.awt.LayoutManager;
 import java.awt.Point;
+import java.awt.RenderingHints;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.image.BufferedImage;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import javax.swing.ImageIcon;
@@ -21,6 +22,7 @@ import javax.swing.JLabel;
 import javax.swing.JLayeredPane;
 import javax.swing.JPanel;
 import javax.swing.JTextPane;
+import javax.swing.SwingUtilities;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.LineBorder;
 
@@ -68,13 +70,7 @@ public class AboutDialog extends JDialog implements Runnable {
     this.setLocation();
     this.setResizable(false);
 
-    ImageIcon background = Icons.honeycomb;
-    if (background.getIconWidth() != BG_WIDTH || background.getIconHeight() != BG_HEIGHT) {
-      // resize the background image
-      Image image = background.getImage();
-      image = image.getScaledInstance(BG_WIDTH, BG_HEIGHT, Image.SCALE_FAST);
-      background.setImage(image);
-    }
+    ImageIcon background = scaledBackground(Icons.honeycomb);
     JPanel bp = new JPanel(new BorderLayout());
     bp.add(new JLabel(background), BorderLayout.CENTER);
     bp.setSize(BG_WIDTH, BG_HEIGHT);
@@ -110,7 +106,7 @@ public class AboutDialog extends JDialog implements Runnable {
     okButton.addActionListener(new ActionListener() {
       public void actionPerformed(ActionEvent e) {
         dispose();
-        kill = true;
+        stopUpdates();
       }
     });
 
@@ -180,10 +176,25 @@ public class AboutDialog extends JDialog implements Runnable {
    * @see java.awt.Dialog#setVisible(boolean)
    */
   public void setVisible(boolean v) {
-    setLocation();
-    updateThread = new Thread(this, "About");
-    updateThread.start();
+    if (v) {
+      setLocation();
+      kill = false;
+      updateThread = new Thread(this, "About");
+      updateThread.setDaemon(true);
+      updateThread.start();
+    } else {
+      stopUpdates();
+    }
     super.setVisible(v);
+  }
+
+  private void stopUpdates() {
+    kill = true;
+    Thread thread = updateThread;
+    updateThread = null;
+    if (thread != null) {
+      thread.interrupt();
+    }
   }
 
   /**
@@ -192,10 +203,13 @@ public class AboutDialog extends JDialog implements Runnable {
    * @see java.lang.Runnable#run()
    */
   public void run() {
-    while (!kill) {
+    Thread current = Thread.currentThread();
+    while (updateThread == current && !kill) {
       try {
         update();
         Thread.sleep(500);
+      } catch (InterruptedException e) {
+        // hidden or replaced
       } catch (Exception e) {
         //
       }
@@ -243,17 +257,6 @@ public class AboutDialog extends JDialog implements Runnable {
     }
 
     /**
-     * Invoked by Swing to draw components. This method should not be called directly, use the
-     * repaint method.
-     * 
-     * @param g the graphics.
-     */
-    public void paint(Graphics g) {
-      update();
-      super.paint(g);
-    }
-
-    /**
      * Formats a long as a number of bytes.
      * 
      * @param bytes the number of bytes
@@ -269,13 +272,19 @@ public class AboutDialog extends JDialog implements Runnable {
      */
     private void update() {
       Runtime r = Runtime.getRuntime();
-      freeMemory.setText(toByteString(r.freeMemory()));
-      totalMemory.setText(toByteString(r.totalMemory()));
-      usedMemory.setText(toByteString(r.totalMemory() - r.freeMemory()));
-      maxMemory.setText(toByteString(r.maxMemory()));
+      setIfChanged(freeMemory, toByteString(r.freeMemory()));
+      setIfChanged(totalMemory, toByteString(r.totalMemory()));
+      setIfChanged(usedMemory, toByteString(r.totalMemory() - r.freeMemory()));
+      setIfChanged(maxMemory, toByteString(r.maxMemory()));
 
       CachedDataSource cache = CachedDataSource.getInstance();
-      cacheMemory.setText(toByteString(cache.getSize()));
+      setIfChanged(cacheMemory, toByteString(cache.getSize()));
+    }
+
+    private void setIfChanged(JLabel label, String text) {
+      if (!text.equals(label.getText())) {
+        label.setText(text);
+      }
     }
   }
 
@@ -283,7 +292,30 @@ public class AboutDialog extends JDialog implements Runnable {
    * Updates the memory information displayed in the dialog.
    */
   public void update() {
-    // this will cause paint to be called on the Event Dispatch Thread
-    memoryPanel.repaint();
+    if (SwingUtilities.isEventDispatchThread()) {
+      memoryPanel.update();
+    } else {
+      SwingUtilities.invokeLater(new Runnable() {
+        public void run() {
+          memoryPanel.update();
+        }
+      });
+    }
+  }
+
+  private static ImageIcon scaledBackground(ImageIcon icon) {
+    if (icon.getIconWidth() == BG_WIDTH && icon.getIconHeight() == BG_HEIGHT) {
+      return icon;
+    }
+    BufferedImage image = new BufferedImage(BG_WIDTH, BG_HEIGHT, BufferedImage.TYPE_INT_RGB);
+    Graphics2D graphics = image.createGraphics();
+    try {
+      graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+          RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+      graphics.drawImage(icon.getImage(), 0, 0, BG_WIDTH, BG_HEIGHT, null);
+    } finally {
+      graphics.dispose();
+    }
+    return new ImageIcon(image);
   }
 }
