@@ -56,7 +56,8 @@ public abstract class AbstractDataRecordClient {
     final Wave wave = new Wave();
     wave.setSamplingRate(dr.getSampleRate());
     Btime btime = dh.getStartBtime();
-    Calendar cal = Calendar.getInstance(TimeZone.getTimeZone("GMT"));
+    Calendar cal = GMT_CALENDAR.get();
+    cal.clear();
     cal.set(Calendar.YEAR, btime.getYear());
     cal.set(Calendar.DAY_OF_YEAR, btime.getDayOfYear());
     cal.set(Calendar.HOUR_OF_DAY, btime.getHour());
@@ -122,6 +123,13 @@ public abstract class AbstractDataRecordClient {
   }
 
   private final SeismicDataSource source;
+
+  private static final ThreadLocal<Calendar> GMT_CALENDAR = new ThreadLocal<Calendar>() {
+    @Override
+    protected Calendar initialValue() {
+      return Calendar.getInstance(TimeZone.getTimeZone("GMT"));
+    }
+  };
 
   /**
    * Create the abstract data record client.
