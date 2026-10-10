@@ -13,6 +13,7 @@ import gov.usgs.volcanoes.core.legacy.plot.render.TextRenderer;
 import gov.usgs.volcanoes.core.time.J2kSec;
 import gov.usgs.volcanoes.swarm.Icons;
 import gov.usgs.volcanoes.swarm.Metadata;
+import gov.usgs.volcanoes.swarm.Offscreen;
 import gov.usgs.volcanoes.swarm.SwarmConfig;
 import gov.usgs.volcanoes.swarm.SwingWorker;
 import gov.usgs.volcanoes.swarm.event.TagData;
@@ -42,7 +43,6 @@ import java.awt.event.MouseWheelListener;
 import java.awt.geom.GeneralPath;
 import java.awt.geom.Line2D;
 import java.awt.geom.Rectangle2D;
-import java.awt.image.BufferedImage;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -93,8 +93,7 @@ public class HelicorderViewPanel extends JComponent implements SwarmOptionsListe
 
   private WaveViewPanel insetWavePanel;
 
-  private BufferedImage bufferImage;
-  private BufferedImage displayImage;
+  private final transient Offscreen offscreen = new Offscreen();
 
   private boolean working;
   private boolean resized;
@@ -647,37 +646,25 @@ public class HelicorderViewPanel extends JComponent implements SwarmOptionsListe
    * Invalidate image.
    */
   public void invalidateImage() {
-    final SwingWorker worker = new SwingWorker() {
-      public Object construct() {
-        createImage();
-        return null;
+    if (heliData == null) {
+      return;
+    }
+    offscreen.render(this, new Offscreen.Painter() {
+      public void paint(Graphics2D graphics) {
+        drawHelicorder(graphics);
       }
-
-      public void finished() {
-        displayImage = bufferImage;
-        repaint();
-      }
-    };
-    worker.start();
+    }, true);
   }
 
   protected void setResized(boolean b) {
     resized = b;
   }
 
-  private void createImage() {
-    if (heliData == null) {
-      return;
-    }
-
+  private void drawHelicorder(Graphics2D ig) {
     Dimension d = this.getSize();
-    if (d.width <= 0 || d.height <= 0) {
+    if (d.width <= 0 || d.height <= 0 || heliData == null) {
       return;
     }
-
-    bufferImage = new BufferedImage(d.width, d.height, BufferedImage.TYPE_4BYTE_ABGR);
-
-    Graphics2D ig = (Graphics2D) bufferImage.getGraphics();
     plot.setSize(d);
 
     double offset = 0;
@@ -907,8 +894,8 @@ public class HelicorderViewPanel extends JComponent implements SwarmOptionsListe
       if (!parent.isWorking()) {
         parent.setStatus("The server returned no helicorder data.");
       }
-    } else if (displayImage != null) {
-      g2.drawImage(displayImage, 0, 0, null);
+    } else if (offscreen.displayed() != null) {
+      g2.drawImage(offscreen.displayed(), 0, 0, null);
     }
 
     drawMark(g2, startMark, DARK_GREEN);

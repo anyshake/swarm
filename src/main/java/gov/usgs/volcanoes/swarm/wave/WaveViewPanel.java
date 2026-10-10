@@ -17,6 +17,7 @@ import gov.usgs.volcanoes.core.time.J2kSec;
 import gov.usgs.volcanoes.quakeml.Pick;
 import gov.usgs.volcanoes.swarm.Icons;
 import gov.usgs.volcanoes.swarm.Metadata;
+import gov.usgs.volcanoes.swarm.Offscreen;
 import gov.usgs.volcanoes.swarm.SwarmConfig;
 import gov.usgs.volcanoes.swarm.SwingWorker;
 import gov.usgs.volcanoes.swarm.data.CachedDataSource;
@@ -117,6 +118,8 @@ public class WaveViewPanel extends JComponent {
    * efficiency.
    */
   protected BufferedImage image;
+  private final transient Offscreen offscreen = new Offscreen();
+  private Plot plot;
   protected double mark1 = Double.NaN;
   protected double mark2 = Double.NaN;
   protected double cursorMark = Double.NaN;
@@ -782,11 +785,8 @@ public class WaveViewPanel extends JComponent {
     processSettings();
   }
 
-  private synchronized void setImage(BufferedImage bi) {
-    image = bi;
-  }
-
   private synchronized BufferedImage getImage() {
+    image = offscreen.displayed();
     return image;
   }
 
@@ -794,34 +794,11 @@ public class WaveViewPanel extends JComponent {
    * Create image.
    */
   public void createImage() {
-    final Runnable r = new Runnable() {
-      public void run() {
-        if (getWidth() > 0 && getHeight() > 0) {
-          BufferedImage bi =
-              new BufferedImage(getWidth(), getHeight(), BufferedImage.TYPE_4BYTE_ABGR);
-          Graphics2D ig = (Graphics2D) bi.getGraphics();
-          constructPlot(ig);
-          setImage(bi);
-        }
+    offscreen.render(this, new Offscreen.Painter() {
+      public void paint(Graphics2D graphics) {
+        constructPlot(graphics);
       }
-    };
-
-    if (SwingUtilities.isEventDispatchThread()) {
-      SwingWorker worker = new SwingWorker() {
-        public Object construct() {
-          r.run();
-          return null;
-        }
-
-        public void finished() {
-          repaint();
-        }
-      };
-      worker.start();
-    } else {
-
-      r.run();
-    }
+    }, true);
   }
 
   /**
@@ -1140,7 +1117,11 @@ public class WaveViewPanel extends JComponent {
     }
     Dimension dim = this.getSize();
 
-    Plot plot = new Plot();
+    if (plot == null) {
+      plot = new Plot();
+    } else {
+      plot.clear();
+    }
     plot.setBackgroundColor(backgroundColor);
     plot.setSize(dim);
     Wave renderWave = wave;

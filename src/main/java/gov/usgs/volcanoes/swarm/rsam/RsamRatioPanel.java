@@ -9,7 +9,7 @@ import gov.usgs.volcanoes.core.legacy.plot.render.AxisRenderer;
 import gov.usgs.volcanoes.core.legacy.plot.render.HistogramRenderer;
 import gov.usgs.volcanoes.core.legacy.plot.render.MatrixRenderer;
 import gov.usgs.volcanoes.core.legacy.plot.render.ShapeRenderer;
-import gov.usgs.volcanoes.swarm.SwingWorker;
+import gov.usgs.volcanoes.swarm.Offscreen;
 import gov.usgs.volcanoes.swarm.time.UiTime;
 import java.awt.BasicStroke;
 import java.awt.Color;
@@ -71,6 +71,7 @@ public class RsamRatioPanel extends JComponent implements SettingsListener {
    * efficiency.
    */
   private BufferedImage image;
+  private final transient Offscreen offscreen = new Offscreen();
 
   /**
    * Constructs a WaveViewPanel with default settings.
@@ -145,42 +146,17 @@ public class RsamRatioPanel extends JComponent implements SettingsListener {
     processSettings();
   }
 
-  private synchronized void setImage(BufferedImage bi) {
-    image = bi;
-  }
-
   private synchronized BufferedImage getImage() {
+    image = offscreen.displayed();
     return image;
   }
 
   private void createImage() {
-    final Runnable r = new Runnable() {
-      public void run() {
-        if (getWidth() > 0 && getHeight() > 0) {
-          BufferedImage bi =
-              new BufferedImage(getWidth(), getHeight(), BufferedImage.TYPE_4BYTE_ABGR);
-          Graphics2D ig = (Graphics2D) bi.getGraphics();
-          constructPlot(ig);
-          setImage(bi);
-        }
+    offscreen.render(this, new Offscreen.Painter() {
+      public void paint(Graphics2D graphics) {
+        constructPlot(graphics);
       }
-    };
-
-    if (SwingUtilities.isEventDispatchThread()) {
-      SwingWorker worker = new SwingWorker() {
-        public Object construct() {
-          r.run();
-          return null;
-        }
-
-        public void finished() {
-          repaint();
-        }
-      };
-      worker.start();
-    } else {
-      r.run();
-    }
+    }, true);
   }
 
   /**
