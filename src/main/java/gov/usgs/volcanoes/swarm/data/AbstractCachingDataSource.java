@@ -657,7 +657,7 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
       rsamBytes -= ce.getMemorySize();
     }
     cl.remove(ce);
-    System.out.println("Removed: " + ce.getInfoString());
+    LOGGER.debug("Removed: {}", ce.getInfoString());
   }
 
   private class HalveLargeWavesPurgeAction extends CachePurgeAction {
