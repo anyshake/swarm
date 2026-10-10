@@ -31,10 +31,12 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,6 +68,14 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
   private final Point2D.Double eventLonLat = new Point2D.Double();
   private final Point2D.Double eventPixel = new Point2D.Double();
   private final Rectangle hitBox = new Rectangle();
+  private final IdentityHashMap<Event, double[]> pixelCache = new IdentityHashMap<Event, double[]>();
+  private final AtomicInteger placeGeneration = new AtomicInteger();
+  private int placedGeneration = -1;
+  private GeoRange placedRange;
+  private Projection placedProjection;
+  private int placedWidth = Integer.MIN_VALUE;
+  private int placedHeight = Integer.MIN_VALUE;
+  private int placedInset = Integer.MIN_VALUE;
 
   private final Map<String, Event> events;
   private final Map<String, Event> importedEvents;
@@ -139,10 +149,7 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
         continue;
       }
 
-      final Point2D.Double xy = projection.forward(eventLonLat);
-
-      eventPixel.x = (((xy.x - ext[0]) / dx) * widthPx + insetPx);
-      eventPixel.y = ((1 - (xy.y - ext[2]) / dy) * heightPx + insetPx);
+      place(event, origin, projection, range, ext, dx, dy, widthPx, heightPx, insetPx);
 
       g2.translate(eventPixel.x, eventPixel.y);
 
@@ -204,6 +211,46 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
     }
   }
 
+  /**
+   * Write this hypocenter's unclamped pixel into {@link #eventPixel}.
+   */
+  private void place(final Event event, final Origin origin, final Projection projection,
+      final GeoRange range, final double[] ext, final double dx, final double dy,
+      final int widthPx, final int heightPx, final int insetPx) {
+    final int generation = placeGeneration.get();
+    if (generation != placedGeneration || placedRange != range || placedProjection != projection
+        || placedWidth != widthPx || placedHeight != heightPx || placedInset != insetPx) {
+      pixelCache.clear();
+      placedGeneration = generation;
+      placedRange = range;
+      placedProjection = projection;
+      placedWidth = widthPx;
+      placedHeight = heightPx;
+      placedInset = insetPx;
+    }
+    final double lon = origin.getLongitude();
+    final double lat = origin.getLatitude();
+    double[] cached = pixelCache.get(event);
+    if (cached != null && Double.doubleToLongBits(cached[2]) == Double.doubleToLongBits(lon)
+        && Double.doubleToLongBits(cached[3]) == Double.doubleToLongBits(lat)) {
+      eventPixel.x = cached[0];
+      eventPixel.y = cached[1];
+      return;
+    }
+    eventLonLat.setLocation(lon, lat);
+    final Point2D.Double xy = projection.forward(eventLonLat);
+    eventPixel.x = (((xy.x - ext[0]) / dx) * widthPx + insetPx);
+    eventPixel.y = ((1 - (xy.y - ext[2]) / dy) * heightPx + insetPx);
+    if (cached == null) {
+      cached = new double[4];
+      pixelCache.put(event, cached);
+    }
+    cached[0] = eventPixel.x;
+    cached[1] = eventPixel.y;
+    cached[2] = lon;
+    cached[3] = lat;
+  }
+
   private int getMarkerSize(double mag) {
     int markerMag = Math.max((int) mag, 0);
     markerMag = Math.min(markerMag, markerSize.length);
@@ -237,17 +284,13 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
     int heightPx = panel.getGraphHeight();
     int insetPx = panel.getInset();
 
-    eventLonLat.setLocation(origin.getLongitude(), origin.getLatitude());
-    final Point2D.Double xy = projection.forward(eventLonLat);
     final double[] ext = panel.projectedExtents();
     final double dx = (ext[1] - ext[0]);
     final double dy = (ext[3] - ext[2]);
 
-    eventPixel.x = (((xy.x - ext[0]) / dx) * widthPx + insetPx);
+    place(hoverEvent, origin, projection, range, ext, dx, dy, widthPx, heightPx, insetPx);
     int maxX = widthPx - popupWidth + POPUP_PADDING;
     eventPixel.x = Math.min(eventPixel.x, maxX);
-
-    eventPixel.y = ((1 - (xy.y - ext[2]) / dy) * heightPx + insetPx);
     if (eventPixel.y < (insetPx + popupHeight)) {
       eventPixel.y += popupHeight;
     }
@@ -323,6 +366,7 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
     HypocenterSource hypocenterSource = swarmConfig.getHypocenterSource();
     if (hypocenterSource == HypocenterSource.NONE) {
       events.clear();
+      placeGeneration.incrementAndGet();
       if (MapFrame.getInstance() != null) {
         MapFrame.getInstance().repaint();
       }
@@ -385,15 +429,13 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
       Magnitude magnitude = event.getPreferredMagnitude();
       int markerDiameter = 5;
       if (magnitude != null) {
-        markerDiameter = getMarkerSize(event.getPreferredMagnitude().getMagnitude().getValue());
+        markerDiameter = getMarkerSize(magnitude.getMagnitude().getValue());
       }
 
-      final Point2D.Double xy = projection.forward(eventLonLat);
-      eventPixel.x = (((xy.x - ext[0]) / dx) * widthPx + insetPx);
-      eventPixel.y = ((1 - (xy.y - ext[2]) / dy) * heightPx + insetPx);
+      place(event, origin, projection, range, ext, dx, dy, widthPx, heightPx, insetPx);
 
       hitBox.setBounds((int) eventPixel.x, (int) eventPixel.y, markerDiameter, markerDiameter);
-      if (hitBox.contains(e.getPoint())) {
+      if (hitBox.contains(e.getX(), e.getY())) {
         LOGGER.debug("set hover event {}", event.publicId);
         hoverEvent = event;
         handled = true;
@@ -414,6 +456,7 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
   public void add(EventSet eventSet) {
     importedEvents.putAll(eventSet);
     events.putAll(eventSet);
+    placeGeneration.incrementAndGet();
     GeoRange gr = new GeoRange();
     for (Event event : eventSet.values()) {
       Origin origin = event.getPreferredOrigin();
@@ -442,6 +485,7 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
     events.clear();
     events.putAll(source.getEventSet());
     events.putAll(importedEvents);
+    placeGeneration.incrementAndGet();
     if (MapFrame.getInstance() != null) {
       MapFrame.getInstance().repaint();
     }
@@ -471,7 +515,7 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
     if (events.containsKey(publicId)) {
       events.remove(publicId);
     }
-
+    placeGeneration.incrementAndGet();
   }
 
   /**
