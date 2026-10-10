@@ -142,6 +142,8 @@ public class SwarmLayout implements Comparable<SwarmLayout> {
     public synchronized void actionPerformed(final ActionEvent e) {
       final String src = e.getActionCommand();
       sources.remove(src);
+      // the waiting thread resumes once this method releases the lock, after any dialog below
+      notifyAll();
       if (e.getID() == DataChooser.NO_DATA_SOURCE) {
         JOptionPane.showMessageDialog(applicationFrame,
             "The data source '" + src + "' does not exist.", "Error", JOptionPane.ERROR_MESSAGE);
@@ -152,8 +154,14 @@ public class SwarmLayout implements Comparable<SwarmLayout> {
       }
     }
 
-    public synchronized boolean finished() {
-      return sources.size() == 0;
+    public synchronized void waitUntilFinished() {
+      while (sources.size() != 0) {
+        try {
+          wait();
+        } catch (final Exception e) {
+          e.printStackTrace();
+        }
+      }
     }
   }
 
@@ -166,13 +174,7 @@ public class SwarmLayout implements Comparable<SwarmLayout> {
         cl.addSource(src);
       }
       DataChooser.getInstance().processLayout(cf, cl);
-      while (!cl.finished()) {
-        try {
-          Thread.sleep(100);
-        } catch (final Exception e) {
-          e.printStackTrace();
-        }
-      }
+      cl.waitUntilFinished();
     }
   }
 
