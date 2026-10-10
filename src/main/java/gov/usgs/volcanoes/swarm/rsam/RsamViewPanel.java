@@ -449,6 +449,14 @@ public class RsamViewPanel extends JComponent implements SettingsListener {
       } catch (LineUnavailableException e) {
         // TODO Auto-generated catch block
         e.printStackTrace();
+      } finally {
+        if (audioInputStream != null) {
+          try {
+            audioInputStream.close();
+          } catch (IOException e) {
+            // nothing more to read; the stream only held the open sound file
+          }
+        }
       }
     }
 
