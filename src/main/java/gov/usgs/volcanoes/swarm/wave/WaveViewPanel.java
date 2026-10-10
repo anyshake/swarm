@@ -684,8 +684,8 @@ public class WaveViewPanel extends JComponent {
         double spDuration = pickData.getSpDuration();
         if (!Double.isNaN(spDuration)) {
           double vp = SwarmConfig.getInstance().pVelocity;
-          double ratio = SwarmConfig.getInstance().velocityRatio;
-          double spDistance = vp == 0.0 ? Double.NaN : spDuration * vp / (ratio - 1.0);
+          double vs = vp / SwarmConfig.getInstance().velocityRatio;
+          double spDistance = spDuration * (vp * vs) / (vp - vs);
           pickStatus = String.format("S-P: %.2fs (%.2fkm)", spDuration, spDistance);
         }
         // Coda
