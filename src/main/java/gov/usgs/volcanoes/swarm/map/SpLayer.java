@@ -34,6 +34,7 @@ public class SpLayer implements MapLayer {
 
   private Color lineColor;
   private int cachedLineColor = Integer.MIN_VALUE;
+  private final Rectangle2D.Double clipRect = new Rectangle2D.Double();
 
   /**
    * Constructor.
@@ -93,8 +94,8 @@ public class SpLayer implements MapLayer {
     int widthPx = panel.getGraphWidth();
     int heightPx = panel.getGraphHeight();
     int inset = panel.getInset();
-    Rectangle2D rectangle = new Rectangle2D.Double(inset, inset, widthPx, heightPx);
-    g2.setClip(rectangle);
+    clipRect.setRect(inset, inset, widthPx, heightPx);
+    g2.setClip(clipRect);
 
     // draw
     GeoRange range = panel.getRange();

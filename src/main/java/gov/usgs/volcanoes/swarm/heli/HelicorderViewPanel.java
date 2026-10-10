@@ -837,6 +837,8 @@ public class HelicorderViewPanel extends JComponent implements SwarmOptionsListe
   }
 
   private final GeneralPath markPath = new GeneralPath();
+  private final Line2D.Double markLine = new Line2D.Double();
+  private final Rectangle2D.Double highlightRect = new Rectangle2D.Double();
 
   private void drawMark(Graphics2D g2, double t, Color color) {
     if (Double.isNaN(t)) {
@@ -851,7 +853,8 @@ public class HelicorderViewPanel extends JComponent implements SwarmOptionsListe
         || x > heliRenderer.getGraphX() + heliRenderer.getGraphWidth() - 1
         || y > heliRenderer.getGraphY() + heliRenderer.getGraphHeight() - 1)) {
       g2.setColor(color);
-      g2.draw(new Line2D.Double(x, y, x, y + translation[2]));
+      markLine.setLine(x, y, x, y + translation[2]);
+      g2.draw(markLine);
 
       markPath.reset();
       markPath.moveTo(x, y);
@@ -971,7 +974,7 @@ public class HelicorderViewPanel extends JComponent implements SwarmOptionsListe
       // finally, draw the highlight.
       Paint pnt = g2.getPaint();
       g2.setPaint(INSET_HIGHLIGHT);
-      Rectangle2D.Double rect = new Rectangle2D.Double();
+      Rectangle2D.Double rect = highlightRect;
 
       int zoomTimeSpan = parent.getHelicorderViewerSettings().waveZoomOffset * 2;
       double zoomPixelSpan = 1.0 / translation[PIXEL_TIME_SPAN] * zoomTimeSpan;
