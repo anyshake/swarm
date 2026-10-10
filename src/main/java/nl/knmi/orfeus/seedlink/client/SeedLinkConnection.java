@@ -1638,6 +1638,13 @@ public class SeedLinkConnection {
     private static final byte[] NO_BYTES = new byte[0];
 
     /**
+     * Smallest {@code byte[]} length that throws OutOfMemoryError
+     * ("Requested array size exceeds VM limit"). Every smaller length keeps
+     * the idle shortcut.
+     */
+    private static final int VM_BYTE_ARRAY_LIMIT = Integer.MAX_VALUE - 1;
+
+    /**
      *
      * Read bytes from the server.
      *
@@ -1651,13 +1658,19 @@ public class SeedLinkConnection {
      */
     public byte[] receiveData(int maxbytes, String code) throws IOException {
 
-        // A positive max with nothing waiting used to allocate that many bytes and throw them away.
-        // The following read still happens only after available() reported data, as before.
-        if (maxbytes > 0 && socketInputStream.available() <= 0) {
+        // Lengths the VM rejects, and negative lengths, are allocated first so
+        // OutOfMemoryError ("Requested array size exceeds VM limit") and
+        // NegativeArraySizeException are thrown before available() is called.
+        // Every smaller positive length still returns immediately when idle.
+        // The read below still runs only after available() reported data.
+        byte[] bytes;
+        if (maxbytes < 0 || maxbytes >= VM_BYTE_ARRAY_LIMIT) {
+            bytes = new byte[maxbytes];
+        } else if (maxbytes > 0 && socketInputStream.available() <= 0) {
             return NO_BYTES;
+        } else {
+            bytes = new byte[maxbytes];
         }
-
-        byte[] bytes = new byte[maxbytes];
 
         // read up to maxbytes
         int nbytesread = 0;
