@@ -222,7 +222,14 @@ public class SLPacket {
                 SeedObjectContainer container = (SeedObjectContainer) seedBuilder.getContainer();
                 int numElem = container.iterate(); // all Blockettes
                 //System.out.println("num elements in packet = " + numElem);
-                this.blockette = (Blockette) container.getNext();
+                Blockette first = (Blockette) container.getNext();
+                // The container returns a decorator that looks itself up in the shared factory on
+                // every field read, which another client's reset() can clear in the middle of the
+                // lookup. The plain blockette holds the same fields and waveform.
+                if (first instanceof CachedBlocketteDecorator) {
+                    first = ((CachedBlocketteDecorator) first).getBlockette();
+                }
+                this.blockette = first;
             }
 
             // reset the volume counter
