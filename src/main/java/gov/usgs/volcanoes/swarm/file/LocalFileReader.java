@@ -85,14 +85,15 @@ public class LocalFileReader implements DataStructureConst, TimeConstants {
   }
 
   /**
-   * Cache the waves from the specified file name.
+   * Cache the waves from the specified file name. Synchronized because the sample buffer, start
+   * time and calendar are shared, and the monitor and each helicorder read on their own threads.
    * 
    * @param station the station.
    * @param file the file.
    * @param error the error string builder or null if none.
    * @return the number of samples cached.
    */
-  public int cacheWaves(String station, File file, StringBuilder error) {
+  public synchronized int cacheWaves(String station, File file, StringBuilder error) {
     count = 0;
     try {
       SeedRecord sr;
