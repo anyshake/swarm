@@ -1463,6 +1463,9 @@ public class WaveViewPanel extends JComponent {
         Wave w = source.getWave(newStation, startTime, endTime);
         if (w != null && w.buffer != null) {
           if (settings.filterOn) {
+            // a caching source can return the wave it holds; filtering that in place changes
+            // the data every other view shows
+            w = new Wave(w);
             w.filter(settings.filter, settings.zeroPhaseShift);
           }
           try {
