@@ -69,24 +69,6 @@ public class SeedLinkSource extends SeismicDataSource {
   /** The earliest start asked of the server for each channel, and when, as {start, millis}. */
   private final ConcurrentHashMap<String, double[]> backfills = new ConcurrentHashMap<>();
 
-  private final DoneListener rtClientsDoneListener;
-
-  /**
-   * Default constructor.
-   */
-  public SeedLinkSource() {
-    // done listener to remove real-time clients when they are done
-    rtClientsDoneListener = new DoneListener() {
-      @Override
-      public void done(String station) {
-        SeedLinkClient client = rtClients.remove(station);
-        if (client != null) {
-          LOGGER.debug("SeedLinkSource rtclient done: {}", client);
-        }
-      }
-    };
-  }
-
   /**
    * Parse config string.
    * 
@@ -282,17 +264,28 @@ public class SeedLinkSource extends SeismicDataSource {
     if (client == null) {
       final double t1 = J2kSec.now() - 600.0;
       final double t2 = Double.NaN;
-      client = new SeedLinkClient(host, port, t1, t2, scnl);
-      LOGGER.debug("SeedLinkSource startRealtimeClient: {}", client);
-      rtClients.put(scnl, client);
-      client.setDoneListener(rtClientsDoneListener);
-      client.updateLastRequestTime();
-      client.start();
-      // wait up to 10 seconds for some data to come back
-      client.waitForData(10000);
-    } else {
-      client.updateLastRequestTime();
+      final SeedLinkClient fresh = new SeedLinkClient(host, port, t1, t2, scnl);
+      // a helicorder and a monitor asking at once must not both start a client for the channel
+      client = rtClients.putIfAbsent(scnl, fresh);
+      if (client == null) {
+        LOGGER.debug("SeedLinkSource startRealtimeClient: {}", fresh);
+        // a client that finishes late must not drop the one that replaced it
+        fresh.setDoneListener(new DoneListener() {
+          @Override
+          public void done(String station) {
+            if (rtClients.remove(station, fresh)) {
+              LOGGER.debug("SeedLinkSource rtclient done: {}", fresh);
+            }
+          }
+        });
+        fresh.updateLastRequestTime();
+        fresh.start();
+        // wait up to 10 seconds for some data to come back
+        fresh.waitForData(10000);
+        return;
+      }
     }
+    client.updateLastRequestTime();
   }
 
   /**
