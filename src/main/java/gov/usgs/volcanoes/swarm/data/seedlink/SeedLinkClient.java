@@ -140,6 +140,9 @@ public class SeedLinkClient implements Runnable, SwarmConst, TimeConstants {
     slconn = new SeedLinkConnection(new SLLog());
     slconn.setBeginTime(j2kToSeedLinkDateString(st));
     slconn.setEndTime(j2kToSeedLinkDateString(et));
+    // After a reconnect, also send the last record's time with its sequence number. A server that
+    // numbers packets per connection, like AnyShake Observer, otherwise resumes at the live end.
+    slconn.setLastpkttime(true);
     slconn.setSLAddress(sladdr);
 
     // Make sure a server was specified
