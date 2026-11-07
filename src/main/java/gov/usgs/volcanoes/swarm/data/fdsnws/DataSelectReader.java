@@ -187,39 +187,48 @@ public class DataSelectReader extends StringMSeedQueryReader {
   public List<DataRecord> read(String query, List<DataRecord> records) throws IOException, SeisFileException {
     URL requestUrl = new URL(urlBase + "?" + query);
     HttpURLConnection conn = (HttpURLConnection) requestUrl.openConnection();
-    if (timeoutMillis != 0) {
-      conn.setReadTimeout(timeoutMillis);
-    }
-    conn.setRequestProperty("User-Agent", userAgent);
-    conn.connect();
-    final int responseCode = conn.getResponseCode();
-    if (responseCode == 204) {
-      LOGGER.debug("No data (URL={})", requestUrl);
-      return records;
-    } else if (responseCode != 200) {
-      throw new SeisFileException(
-          "Did not get an OK repsonse code (CODE=" + responseCode + ", URL=" + requestUrl + ")");
-    }
-    BufferedInputStream bif = new BufferedInputStream(conn.getInputStream());
-    DataInputStream in = new DataInputStream(bif);
-    while (true) {
-      try {
-        SeedRecord sr = SeedRecord.read(in);
-        if (sr instanceof DataRecord) {
-          if (processRecord((DataRecord) sr) && records != null) {
-            records.add((DataRecord) sr);
+    // a fully read body returns the connection for reuse; every other way out closes it
+    boolean bodyRead = false;
+    try {
+      if (timeoutMillis != 0) {
+        conn.setReadTimeout(timeoutMillis);
+      }
+      conn.setRequestProperty("User-Agent", userAgent);
+      conn.connect();
+      final int responseCode = conn.getResponseCode();
+      if (responseCode == 204) {
+        LOGGER.debug("No data (URL={})", requestUrl);
+        return records;
+      } else if (responseCode != 200) {
+        throw new SeisFileException(
+            "Did not get an OK repsonse code (CODE=" + responseCode + ", URL=" + requestUrl + ")");
+      }
+      try (DataInputStream in = new DataInputStream(new BufferedInputStream(conn.getInputStream()))) {
+        while (true) {
+          try {
+            SeedRecord sr = SeedRecord.read(in);
+            if (sr instanceof DataRecord) {
+              if (processRecord((DataRecord) sr) && records != null) {
+                records.add((DataRecord) sr);
+              }
+            } else {
+              LOGGER.warn("Not a data record, skipping (SN={}, TC={}, URL={})",
+                  sr.getControlHeader().getSequenceNum(), sr.getControlHeader().getTypeCode(),
+                  requestUrl);
+            }
+          } catch (EOFException e) {
+            // end of data?
+            break;
           }
-        } else {
-          LOGGER.warn("Not a data record, skipping (SN={}, TC={}, URL={})", sr.getControlHeader().getSequenceNum(),
-              sr.getControlHeader().getTypeCode(), requestUrl);
         }
-      } catch (EOFException e) {
-        // end of data?
-        break;
+      }
+      bodyRead = true;
+      return records;
+    } finally {
+      if (!bodyRead) {
+        conn.disconnect();
       }
     }
-    in.close();
-    return records;
   }
 
   /**
