@@ -1206,6 +1206,17 @@ public class WaveViewPanel extends JComponent {
   }
 
   /**
+   * The samples of a wave inside the view. SliceWave ignores a slice that runs past either end of
+   * the samples, and live data always ends before the view does, so the slice is clamped first;
+   * otherwise the whole wave would be scaled and drawn.
+   */
+  private SliceWave slice(Wave w) {
+    SliceWave sw = new SliceWave(w);
+    sw.setSlice(Math.max(startTime, w.getStartTime()), Math.min(endTime, w.getEndTime()));
+    return sw;
+  }
+
+  /**
    * Plots a wave.
    * 
    * @param renderWave the wave to plot
@@ -1215,8 +1226,7 @@ public class WaveViewPanel extends JComponent {
       return;
     }
 
-    SliceWave wv = new SliceWave(renderWave);
-    wv.setSlice(startTime, endTime);
+    SliceWave wv = slice(renderWave);
 
     double offset = 0;
     double multiplier = 1;
@@ -1294,8 +1304,7 @@ public class WaveViewPanel extends JComponent {
       return;
     }
 
-    SliceWave wv = new SliceWave(renderWave);
-    wv.setSlice(startTime, endTime);
+    SliceWave wv = slice(renderWave);
 
     if (spectraRenderer == null) {
       spectraRenderer = new SpectraRenderer();
@@ -1342,8 +1351,7 @@ public class WaveViewPanel extends JComponent {
       return;
     }
 
-    SliceWave wv = new SliceWave(renderWave);
-    wv.setSlice(startTime, endTime);
+    SliceWave wv = slice(renderWave);
 
     if (spectrogramRenderer == null) {
       spectrogramRenderer = new SpectrogramRenderer();
@@ -1432,8 +1440,7 @@ public class WaveViewPanel extends JComponent {
       return;
     }
 
-    SliceWave swave = new SliceWave(wave);
-    swave.setSlice(startTime, endTime);
+    SliceWave swave = slice(wave);
     String component = c.substring(2);
     String[] orientationType = new String[] { "Z", "N", "E" };
     if (component.matches("[ABC]")) {
@@ -1470,8 +1477,7 @@ public class WaveViewPanel extends JComponent {
             w.filter(settings.filter, settings.zeroPhaseShift);
           }
           try {
-            SliceWave sw = new SliceWave(w);
-            sw.setSlice(startTime, endTime);
+            SliceWave sw = slice(w);
             data.put(direction, sw.getSignal());
           } catch (NullPointerException e) {
             data.put(direction, new double[0]);
