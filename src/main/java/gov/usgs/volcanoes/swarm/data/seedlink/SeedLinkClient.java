@@ -59,6 +59,8 @@ public class SeedLinkClient implements Runnable, SwarmConst, TimeConstants {
   /** End of the newest sample received, J2K. Guarded by dataSync. */
   private double dataEnd = Double.NEGATIVE_INFINITY;
   private boolean doneFlag;
+  /** Whether the server answered the request with ERROR. */
+  private volatile boolean refused;
 
   /** SeedLink server address. */
   private final String sladdr;
@@ -427,6 +429,12 @@ public class SeedLinkClient implements Runnable, SwarmConst, TimeConstants {
       if (slpack != null && slpack != SLPacket.SLTERMINATE) {
         count = 1;
         do {
+          if (slpack == SLPacket.SLERROR) {
+            // the same request would only be refused again
+            refused = true;
+            LOGGER.debug("SeedLinkClient request refused: {}", this);
+            break;
+          }
           // ensure the blockette is created if needed, before the volume counter resets
           final int packetType = slpack.getType();
           // the factory is shared by every client; SLPacket decodes under the same lock
@@ -496,7 +504,7 @@ public class SeedLinkClient implements Runnable, SwarmConst, TimeConstants {
    * 
    * @return true if data is available.
    */
-  private boolean isData() {
+  boolean isData() {
     synchronized (dataSync) {
       return dataFlag;
     }
@@ -625,6 +633,15 @@ public class SeedLinkClient implements Runnable, SwarmConst, TimeConstants {
     synchronized (dataSync) {
       return dataEnd >= endTime || isDone();
     }
+  }
+
+  /**
+   * Determines if the server refused the request, for example a time window longer than it serves.
+   *
+   * @return true if the server answered ERROR.
+   */
+  boolean isRefused() {
+    return refused;
   }
 
   protected synchronized boolean isRunning() {
