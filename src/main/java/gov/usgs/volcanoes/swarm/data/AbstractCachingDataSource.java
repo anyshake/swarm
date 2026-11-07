@@ -603,70 +603,53 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
    * @param source data source
    * @return
    */
-  public synchronized HelicorderData getHelicorder(final String station, final double t1,
+  public HelicorderData getHelicorder(final String station, final double t1,
       final double t2, final SeismicDataSource source) {
-    final List<CachedHelicorder> helis = helicorderCache.get(station);
-    if (helis == null) {
-      return null;
-    } else {
-      HelicorderData hd;
-      for (final CachedHelicorder ch : helis) {
+    final CachedHelicorder ch;
+    final double ct1;
+    final double ct2;
+    synchronized (this) {
+      final List<CachedHelicorder> helis = helicorderCache.get(station);
+      if (helis == null) {
+        return null;
+      }
+      CachedHelicorder found = null;
+      for (final CachedHelicorder c : helis) {
         // asked for area completely within one cache entry
-        if (t1 >= ch.t1 && t2 <= ch.t2) {
-          // System.out.println("totally cached");
-          hd = ch.helicorder.subset(t1, t2);
-          ch.lastAccess = System.currentTimeMillis();
-          return hd;
+        if (t1 >= c.t1 && t2 <= c.t2) {
+          c.lastAccess = System.currentTimeMillis();
+          return c.helicorder.subset(t1, t2);
         }
 
-        // one entry completely within asked for area
-        if (t1 < ch.t1 && t2 > ch.t2) {
-          // System.out.println("cache is centered chunk");
-          HelicorderData nhd = source.getHelicorder(station, t1, ch.t1, null);
-          if (nhd != null) {
-            hd = ch.helicorder.combine(nhd);
-          } else {
-            hd = ch.helicorder;
-          }
-          nhd = source.getHelicorder(station, ch.t2, t2, null);
-          if (nhd != null) {
-            hd = hd.combine(nhd);
-          }
-          ch.lastAccess = System.currentTimeMillis();
-          return hd;
-        }
-
-        // asked for area is to left but overlaps
-        if (t1 < ch.t1 && t2 > ch.t1 && t2 <= ch.t2) {
-          // System.out.println("cache overlaps on right side");
-          final HelicorderData nhd = source.getHelicorder(station, t1, ch.t1, null);
-          if (nhd != null) {
-            hd = ch.helicorder.combine(nhd);
-            ch.lastAccess = System.currentTimeMillis();
-            return hd;
-          } else {
-            ch.lastAccess = System.currentTimeMillis();
-            return ch.helicorder;
-          }
-
-        }
-
-        // asked for area is to right but overlaps
-        if (t1 > ch.t1 && t1 < ch.t2 && t2 > ch.t2) {
-          // System.out.println("cache overlaps on left side");
-          final HelicorderData nhd = source.getHelicorder(station, ch.t2, t2, null);
-          if (nhd != null) {
-            hd = ch.helicorder.combine(nhd);
-            ch.lastAccess = System.currentTimeMillis();
-            return hd;
-          } else {
-            ch.lastAccess = System.currentTimeMillis();
-            return ch.helicorder;
-          }
+        // entry within asked for area, or asked for area overlaps its left or right side
+        if ((t1 < c.t1 && t2 > c.t1) || (t1 > c.t1 && t1 < c.t2 && t2 > c.t2)) {
+          found = c;
+          break;
         }
       }
+      if (found == null) {
+        return null;
+      }
+      ch = found;
+      ct1 = ch.t1;
+      ct2 = ch.t2;
     }
-    return null;
+
+    // The source fetches the missing sides from its server; do not hold the cache meanwhile.
+    final HelicorderData left = t1 < ct1 ? source.getHelicorder(station, t1, ct1, null) : null;
+    final HelicorderData right = t2 > ct2 ? source.getHelicorder(station, ct2, t2, null) : null;
+
+    synchronized (this) {
+      HelicorderData hd = ch.helicorder;
+      if (left != null) {
+        hd = hd.combine(left);
+      }
+      if (right != null) {
+        hd = hd.combine(right);
+      }
+      ch.lastAccess = System.currentTimeMillis();
+      return hd;
+    }
   }
 
   private synchronized void flushHelicorders() {
