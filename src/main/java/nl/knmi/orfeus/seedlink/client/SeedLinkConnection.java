@@ -1492,7 +1492,8 @@ public class SeedLinkConnection {
             sock.setReuseAddress(true);
             sock.setKeepAlive(true);
 
-            sock.connect(new InetSocketAddress(host_name, nport));
+            // connect() without a timeout waited for the operating system, often over a minute
+            sock.connect(new InetSocketAddress(host_name, nport), 10000);
             // reads wait for data instead of polling for it
             sock.setSoTimeout(READ_WAIT_MS);
 
