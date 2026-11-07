@@ -9,3 +9,4 @@
 .DS_Store
 *.log
 logback.*
+/dependency-reduced-pom.xml
