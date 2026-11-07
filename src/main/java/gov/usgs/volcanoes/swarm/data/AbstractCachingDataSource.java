@@ -359,7 +359,9 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
    */
   public HelicorderData createHelicorderData(final String station, final Wave wave) {
     HelicorderData helicorder = createHelicorderData(wave);
-    putHelicorder(station, helicorder);
+    if (helicorder.rows() > 0) {
+      putHelicorder(station, helicorder);
+    }
     return helicorder;
   }
 

@@ -103,20 +103,27 @@ public abstract class SeismicDataSource {
       }
     }
 
+    // A second without samples (a gap) gets no row. Its row had time 0, which sorted to the front
+    // of the helicorder, so a source took the cache to hold data back to 2000.
+    int rows = 0;
     boolean needsMean = false;
     for (int i = 0; i < seconds; i++) {
-      if (minima[i] == Integer.MAX_VALUE || maxima[i] == Integer.MIN_VALUE) {
-        needsMean = true;
-        break;
+      if (maxima[i] != Integer.MIN_VALUE) {
+        rows++;
+        needsMean |= minima[i] == Integer.MAX_VALUE;
       }
     }
     final double mean = needsMean ? wave.mean() : 0;
 
-    final DoubleMatrix2D data = DoubleFactory2D.dense.make(seconds, 3);
+    final DoubleMatrix2D data = DoubleFactory2D.dense.make(rows, 3);
+    int row = 0;
     for (int i = 0; i < seconds; i++) {
-      data.setQuick(i, 0, times[i]);
-      data.setQuick(i, 1, minima[i] == Integer.MAX_VALUE ? mean : minima[i]);
-      data.setQuick(i, 2, maxima[i] == Integer.MIN_VALUE ? mean : maxima[i]);
+      if (maxima[i] != Integer.MIN_VALUE) {
+        data.setQuick(row, 0, times[i]);
+        data.setQuick(row, 1, minima[i] == Integer.MAX_VALUE ? mean : minima[i]);
+        data.setQuick(row, 2, maxima[i]);
+        row++;
+      }
     }
 
     final HelicorderData hd = new HelicorderData();
