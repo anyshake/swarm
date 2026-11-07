@@ -2,11 +2,16 @@ package gov.usgs.volcanoes.swarm;
 
 import gov.usgs.volcanoes.core.configfile.ConfigFile;
 import java.awt.Color;
+import java.awt.Component;
+import java.awt.Container;
 import java.awt.Dimension;
+import java.awt.Graphics;
 import java.awt.Point;
+import java.awt.Rectangle;
 import javax.swing.JComponent;
 import javax.swing.JFrame;
 import javax.swing.JInternalFrame;
+import javax.swing.SwingUtilities;
 import javax.swing.plaf.basic.BasicInternalFrameUI;
 
 /**
@@ -39,6 +44,48 @@ public class SwarmFrame extends JInternalFrame {
     setOpaque(false);
     setBackground(new Color(255, 255, 255, 0));
     swarmConfig = SwarmConfig.getInstance();
+  }
+
+  /**
+   * Skips the border when an opaque content pane, this frame's or one painted above it, covers the
+   * whole repaint. That pane paints over every pixel the border would draw there. The Aqua border
+   * draws the whole frame as one native image that is too large to cache, so without this every
+   * live wave repaint redrew the title bars of the frames it overlaps.
+   */
+  @Override
+  protected void paintBorder(Graphics g) {
+    Rectangle clip = g.getClipBounds();
+    if (clip == null || !coveredByContent(clip)) {
+      super.paintBorder(g);
+    }
+  }
+
+  private boolean coveredByContent(Rectangle clip) {
+    if (contentCovers(this, clip)) {
+      return true;
+    }
+    Container parent = getParent();
+    if (parent == null) {
+      return false;
+    }
+    // Lower indexes are painted after this frame, on top of it.
+    for (Component sibling : parent.getComponents()) {
+      if (sibling == this) {
+        return false;
+      }
+      if (sibling instanceof JInternalFrame && sibling.isVisible()
+          && contentCovers((JInternalFrame) sibling, clip)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private boolean contentCovers(JInternalFrame frame, Rectangle clip) {
+    Container content = frame.getContentPane();
+    return content != null && content.isOpaque() && content.isVisible()
+        && SwingUtilities.convertRectangle(content.getParent(), content.getBounds(), this)
+            .contains(clip);
   }
 
   /**
