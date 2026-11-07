@@ -75,10 +75,6 @@ public class MapMiniPanel extends JComponent
       new Line2D.Double(), new Line2D.Double(), new Line2D.Double(), new Line2D.Double(),
       new Line2D.Double(), new Line2D.Double(), new Line2D.Double()};
   private int labelWidth = 1;
-  private String cachedLabel;
-  private boolean cachedLabelWave;
-  private Metadata cachedLabelMetadata;
-  private int cachedLabelCount = -1;
   private JLabel close;
 
   private JPopupMenu popup;
@@ -514,24 +510,16 @@ public class MapMiniPanel extends JComponent
    * @return station label.
    */
   public String getLabel() {
-    final int count = metadataList.size();
-    if (cachedLabel != null && cachedLabelWave == waveVisible
-        && cachedLabelMetadata == activeMetadata && cachedLabelCount == count) {
-      return cachedLabel;
-    }
-    String label;
+    String label = null;
     if (waveVisible) {
       label = activeMetadata.getScnl().toString();
-      if (count > 1) {
+      if (metadataList.size() > 1) {
         label += "+";
       }
     } else {
       label = activeMetadata.getScnl().station;
     }
-    cachedLabel = label;
-    cachedLabelWave = waveVisible;
-    cachedLabelMetadata = activeMetadata;
-    cachedLabelCount = count;
+
     return label;
   }
 
@@ -596,10 +584,7 @@ public class MapMiniPanel extends JComponent
     determineSelection(e);
     setPosition(Position.MANUAL_SET);
     Point pt = getLocation();
-    if (manualPositionXy == null) {
-      manualPositionXy = new Point2D.Double();
-    }
-    manualPositionXy.setLocation(pt.x, pt.y);
+    manualPositionXy = new Point2D.Double(pt.x, pt.y);
     if (e.getClickCount() == 2) {
       if (activeMetadata.source != null) {
         HelicorderViewerFrame hvf =
@@ -722,10 +707,7 @@ public class MapMiniPanel extends JComponent
     startX = p.x;
     startY = p.y;
     // manualPosition = parent.getLonLat(p.x, p.y);
-    if (manualPositionXy == null) {
-      manualPositionXy = new Point2D.Double();
-    }
-    manualPositionXy.setLocation(p.x, p.y);
+    manualPositionXy = new Point2D.Double(p.x, p.y);
     adjustLine();
     getParent().repaint();
   }
