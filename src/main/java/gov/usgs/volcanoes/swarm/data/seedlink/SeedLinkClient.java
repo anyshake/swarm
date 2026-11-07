@@ -53,6 +53,15 @@ public class SeedLinkClient implements Runnable, SwarmConst, TimeConstants {
     timeout = value;
   }
 
+  /** Seconds without data after which the server is asked for its ID. */
+  private static final int KEEPALIVE_SECONDS = 10;
+
+  /**
+   * Seconds without anything from the server after which the link is reopened. AnyShake Observer
+   * sends nothing, not even a keepalive answer, until its history query for a request is done.
+   */
+  private static final int NET_TIMEOUT_SECONDS = 60;
+
   private final Object dataSync = new Object();
   private final Object doneSync = new Object();
   private boolean dataFlag;
@@ -145,6 +154,11 @@ public class SeedLinkClient implements Runnable, SwarmConst, TimeConstants {
     // After a reconnect, also send the last record's time with its sequence number. A server that
     // numbers packets per connection, like AnyShake Observer, otherwise resumes at the live end.
     slconn.setLastpkttime(true);
+    // A link that died without a FIN (Wi-Fi dropped, a NAT or the server forgot it) went unnoticed
+    // for the library's 120 s network timeout. After a silence, ask the server for its ID: a live
+    // server answers even when its streams are quiet, so only a dead link stays silent.
+    slconn.setKeepAlive(KEEPALIVE_SECONDS);
+    slconn.setNetTimout(NET_TIMEOUT_SECONDS);
     slconn.setSLAddress(sladdr);
 
     // Make sure a server was specified
