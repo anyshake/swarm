@@ -12,7 +12,6 @@ import gov.usgs.volcanoes.swarm.SwarmConfig;
 import gov.usgs.volcanoes.swarm.SwingWorker;
 import gov.usgs.volcanoes.swarm.map.MapFrame;
 import java.io.File;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -236,32 +235,8 @@ public class FileDataSource extends AbstractCachingDataSource {
 
   @Override
   public Wave getWave(final String station, final double t1, final double t2) {
-    Wave wave;
-    final List<CachedWave> waves = waveCache.get(station.replace(' ', '$'));
-    if (waves == null) {
-      return null;
-    } else {
-      final List<Wave> parts = new ArrayList<Wave>();
-      double minT = 1E300;
-      double maxT = -1E300;
-      for (final CachedWave cw : waves) {
-        if (cw.wave.overlaps(t1, t2)) {
-          parts.add(cw.wave);
-          minT = Math.min(minT, cw.t1);
-          maxT = Math.max(maxT, cw.t2);
-        }
-      }
-
-      if (parts.size() == 1) {
-        return parts.get(0);
-      }
-
-      wave = Wave.join(parts, minT, maxT);
-      if (wave != null) {
-        wave = wave.subset(t1, t2);
-      }
-    }
-    return wave;
+    // under the cache lock: a file being opened adds waves to the same lists
+    return getBestWave(station.replace(' ', '$'), t1, t2);
   }
 
   @Override
