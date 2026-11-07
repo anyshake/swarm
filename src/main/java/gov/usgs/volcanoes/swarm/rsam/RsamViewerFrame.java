@@ -69,6 +69,7 @@ public class RsamViewerFrame extends SwarmFrame implements Runnable, SettingsLis
   private JPanel rsamPanel;
 
   private Throbber throbber;
+  private final Object fetchLock = new Object();
 
   /**
    * RSAM viewer frame constructor.
@@ -228,30 +229,33 @@ public class RsamViewerFrame extends SwarmFrame implements Runnable, SettingsLis
   /**
    * Get RSAM data and set it in view panel.
    */
-  public synchronized void getRsam() {
-    throbber.increment();
+  public void getRsam() {
+    // Not the frame's own lock: Swing takes that one on the event thread to add listeners.
+    synchronized (fetchLock) {
+      throbber.increment();
 
-    viewPanel.setWorking(true);
-    double now = J2kSec.now();
-    double st = now - settings.getSpanLength();
+      viewPanel.setWorking(true);
+      double now = J2kSec.now();
+      double st = now - settings.getSpanLength();
 
-    int period;
-    if (settings.getType() == ViewType.VALUES) {
-      period = settings.valuesPeriodS;
-    } else {
-      period = settings.countsPeriodS;
+      int period;
+      if (settings.getType() == ViewType.VALUES) {
+        period = settings.valuesPeriodS;
+      } else {
+        period = settings.countsPeriodS;
+      }
+
+      st -= st % period;
+
+      double et = now;
+      et += period - (et % period);
+      RSAMData data = ((RsamSource) dataSource).getRsam(channel, st, et, period);
+      viewPanel.setData(data, now - settings.getSpanLength(), now);
+      viewPanel.setChannel(channel);
+      viewPanel.setWorking(false);
+      viewPanel.repaint();
+      throbber.decrement();
     }
-
-    st -= st % period;
-
-    double et = now;
-    et += period - (et % period);
-    RSAMData data = ((RsamSource) dataSource).getRsam(channel, st, et, period);
-    viewPanel.setData(data, now - settings.getSpanLength(), now);
-    viewPanel.setChannel(channel);
-    viewPanel.setWorking(false);
-    viewPanel.repaint();
-    throbber.decrement();
   }
 
   public void pause() {

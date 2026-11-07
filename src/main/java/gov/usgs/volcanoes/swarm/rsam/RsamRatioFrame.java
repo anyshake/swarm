@@ -44,6 +44,7 @@ public class RsamRatioFrame extends JInternalFrame implements Runnable, Settings
   private Thread updateThread;
   private boolean run;
   private Throbber throbber;
+  private final Object fetchLock = new Object();
 
   private RsamViewSettings settings;
 
@@ -163,31 +164,34 @@ public class RsamRatioFrame extends JInternalFrame implements Runnable, Settings
   /**
    * Get RSAM ratio and set it in view panel.
    */
-  public synchronized void getRsamRatio() {
-    throbber.increment();
+  public void getRsamRatio() {
+    // Not the frame's own lock: Swing takes that one on the event thread to add listeners.
+    synchronized (fetchLock) {
+      throbber.increment();
 
-    viewPanel.setWorking(true);
-    double now = J2kSec.now();
-    double st = now - settings.getSpanLength();
+      viewPanel.setWorking(true);
+      double now = J2kSec.now();
+      double st = now - settings.getSpanLength();
 
-    int period;
-    if (settings.getType() == ViewType.VALUES) {
-      period = settings.valuesPeriodS;
-    } else {
-      period = settings.countsPeriodS;
+      int period;
+      if (settings.getType() == ViewType.VALUES) {
+        period = settings.valuesPeriodS;
+      } else {
+        period = settings.countsPeriodS;
+      }
+      st -= st % period;
+
+      double et = now;
+      et += period - (et % period);
+      RSAMData data1 = ((RsamSource) ds1).getRsam(channel1, st, et, period);
+      RSAMData data2 = ((RsamSource) ds2).getRsam(channel2, st, et, period);
+      RSAMData ratData = data1.getRatSAM(data2);
+      viewPanel.setData(ratData, now - settings.getSpanLength(), now);
+      viewPanel.setChannel(channel1);
+      viewPanel.setWorking(false);
+      viewPanel.repaint();
+      throbber.decrement();
     }
-    st -= st % period;
-
-    double et = now;
-    et += period - (et % period);
-    RSAMData data1 = ((RsamSource) ds1).getRsam(channel1, st, et, period);
-    RSAMData data2 = ((RsamSource) ds2).getRsam(channel2, st, et, period);
-    RSAMData ratData = data1.getRatSAM(data2);
-    viewPanel.setData(ratData, now - settings.getSpanLength(), now);
-    viewPanel.setChannel(channel1);
-    viewPanel.setWorking(false);
-    viewPanel.repaint();
-    throbber.decrement();
   }
 
   public void pause() {
