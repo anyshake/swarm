@@ -13,8 +13,8 @@ import java.awt.Stroke;
 import java.awt.event.MouseEvent;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Vector;
 
 /**
  * This layer will draw S-P circles on the map.
@@ -33,7 +33,6 @@ public class SpLayer implements MapLayer {
   private Color lineColor;
   private int cachedLineColor = Integer.MIN_VALUE;
   private final Rectangle2D.Double clipRect = new Rectangle2D.Double();
-  private final List<Sp> stations = new ArrayList<Sp>();
 
   /**
    * Constructor.
@@ -43,34 +42,26 @@ public class SpLayer implements MapLayer {
   }
 
   /**
-   * Refresh the S-P circles, reusing station rows when the clipboard still has them.
+   * Update list of S-P circles to draw.
    */
-  private synchronized void refreshStations() {
-    int count = 0;
-    final List<WaveViewPanel> waves = WaveClipboardFrame.getInstance().getWaves();
+  private synchronized Vector<Sp> updateSpList() {
+    Vector<Sp> spList = new Vector<Sp>();
+    List<WaveViewPanel> waves = WaveClipboardFrame.getInstance().getWaves();
     if (WaveClipboardFrame.getInstance().isPickEnabled()) {
-      for (final WaveViewPanel wvp : waves) {
-        final PickData pickData = wvp.getPickData();
+      for (WaveViewPanel wvp : waves) {
+        PickData pickData = wvp.getPickData();
         if (pickData != null && pickData.isPlot() && pickData.getPick(PickData.P) != null
             && pickData.isPickChannel(PickData.P)) {
-          final String channel = wvp.getChannel();
-          final double distance = pickData.getSpDistance();
+          String channel = wvp.getChannel();
+          double distance = pickData.getSpDistance();
           if (!Double.isNaN(distance)) {
-            if (count < stations.size()) {
-              stations.get(count).set(channel, distance, pickData.getSpMinDistance(),
-                  pickData.getSpMaxDistance());
-            } else {
-              stations.add(new Sp(channel, distance, pickData.getSpMinDistance(),
-                  pickData.getSpMaxDistance()));
-            }
-            count++;
+            spList.add(new Sp(channel, distance, pickData.getSpMinDistance(),
+                pickData.getSpMaxDistance()));
           }
         }
       }
     }
-    if (stations.size() > count) {
-      stations.subList(count, stations.size()).clear();
-    }
+    return spList;
   }
 
   /**
@@ -90,8 +81,8 @@ public class SpLayer implements MapLayer {
     g2.setColor(lineColor);
 
     // First get updated list of S-P
-    refreshStations();
-    if (stations.size() == 0) {
+    Vector<Sp> spList = updateSpList();
+    if (spList.size() == 0) {
       return;
     }
 
@@ -107,7 +98,7 @@ public class SpLayer implements MapLayer {
     // draw
     final double[] ext = panel.projectedExtents();
     final double dx = (ext[1] - ext[0]);
-    for (final Sp sp : stations) {
+    for (Sp sp : spList) {
       Metadata md = SwarmConfig.getInstance().getMetadata(sp.channel);
       if (md == null) {
         continue;
@@ -150,10 +141,6 @@ public class SpLayer implements MapLayer {
     private double maxDistance;
 
     Sp(String channel, double distance, double minDistance, double maxDistance) {
-      set(channel, distance, minDistance, maxDistance);
-    }
-
-    void set(String channel, double distance, double minDistance, double maxDistance) {
       this.channel = channel;
       this.distance = distance;
       this.minDistance = minDistance;
