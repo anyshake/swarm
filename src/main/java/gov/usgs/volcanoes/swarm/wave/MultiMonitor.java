@@ -885,19 +885,15 @@ public class MultiMonitor extends SwarmFrame implements Kioskable {
         Wave sw = waveMap.get(channel);
         if (sw != null) {
           if (sw.overlaps(start, now)) { // runaway monitor bug fix
+            Wave newer = null;
             if (sw.getEndTime() < now) {
-              final Wave w2 = dataSource.getWave(channel, sw.getEndTime() - 10, now);
-              if (w2 != null && (sw.overlaps(w2) || sw.adjacent(w2))) {
-                sw = sw.combine(w2);
-              }
+              newer = dataSource.getWave(channel, sw.getEndTime() - 10, now);
             }
+            Wave older = null;
             if (sw.getStartTime() > start) {
-              final Wave w2 = dataSource.getWave(channel, start, sw.getStartTime() + 10);
-              if (w2 != null && (sw.overlaps(w2) || sw.adjacent(w2))) {
-                sw = sw.combine(w2);
-              }
+              older = dataSource.getWave(channel, start, sw.getStartTime() + 10);
             }
-            sw = sw.subset(start, sw.getEndTime());
+            sw = window(start, older, sw, newer);
           } else {
             sw = null;
           }
@@ -916,6 +912,58 @@ public class MultiMonitor extends SwarmFrame implements Kioskable {
       }
       wvp.setWorking(false);
     }
+  }
+
+  /**
+   * A new wave of the samples of older, sw and newer from the one at or before start on, a later
+   * wave's samples over an earlier one's and NO_DATA where none has any; a wave that does not touch
+   * sw is left out. Every sample goes on the sample grid of the newest wave, as the data source
+   * timed it, so rounding does not add up over refreshes. Wave.combine rounds the joined length up
+   * and Wave.subset gives the first sample the time start, so with them the samples moved on
+   * every refresh and the moves added up.
+   *
+   * @return the window, or null if a wave is empty or has another sampling rate
+   */
+  private static Wave window(final double start, final Wave older, final Wave sw,
+      final Wave newer) {
+    if (sw.numSamples() == 0) {
+      return null;
+    }
+    final double sr = sw.getSamplingRate();
+    final Wave[] parts = { older, sw, newer };
+    Wave grid = sw;
+    for (int i = 0; i < parts.length; i++) {
+      final Wave w = parts[i];
+      if (w == null || w.numSamples() == 0 || !(sw.overlaps(w) || sw.adjacent(w))) {
+        parts[i] = null;
+      } else if (Math.abs(w.getSamplingRate() - sr) >= 0.001) {
+        return null;
+      } else {
+        grid = w;
+      }
+    }
+    final double t0 = grid.getStartTime();
+    final int[] at = new int[parts.length];
+    int from = Integer.MAX_VALUE;
+    int to = Integer.MIN_VALUE;
+    for (int i = 0; i < parts.length; i++) {
+      if (parts[i] != null) {
+        at[i] = (int) Math.round((parts[i].getStartTime() - t0) * sr);
+        from = Math.min(from, at[i]);
+        to = Math.max(to, at[i] + parts[i].numSamples());
+      }
+    }
+    from = Math.max(from, (int) Math.floor((start - t0) * sr));
+    final int[] buffer = new int[Math.max(0, to - from)];
+    Arrays.fill(buffer, Wave.NO_DATA);
+    for (int i = 0; i < parts.length; i++) {
+      final int skip = Math.max(0, from - at[i]);
+      if (parts[i] != null && parts[i].numSamples() > skip) {
+        System.arraycopy(parts[i].buffer, skip, buffer, at[i] + skip - from,
+            parts[i].numSamples() - skip);
+      }
+    }
+    return new Wave(buffer, t0 + from / sr, sr);
   }
 
   /**
