@@ -12,6 +12,7 @@ import gov.usgs.volcanoes.swarm.SwarmConfig;
 import gov.usgs.volcanoes.swarm.SwarmFrame;
 import gov.usgs.volcanoes.swarm.SwarmUtil;
 import gov.usgs.volcanoes.swarm.Throbber;
+import gov.usgs.volcanoes.swarm.Workers;
 import gov.usgs.volcanoes.swarm.chooser.DataChooser;
 import gov.usgs.volcanoes.swarm.data.RsamSource;
 import gov.usgs.volcanoes.swarm.data.SeismicDataSource;
@@ -289,7 +290,13 @@ public class RsamViewerFrame extends SwarmFrame implements Runnable, SettingsLis
     }
 
     spanIndex = i;
-    getRsam();
+    // Toolbar clicks land here on the event thread; fetch on a worker so a slow server does not
+    // freeze the UI.
+    Workers.execute(new Runnable() {
+      public void run() {
+        getRsam();
+      }
+    });
   }
 
   class CaptureActionListener implements ActionListener {

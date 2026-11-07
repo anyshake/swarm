@@ -6,6 +6,7 @@ import gov.usgs.volcanoes.core.util.UiUtils;
 import gov.usgs.volcanoes.swarm.Icons;
 import gov.usgs.volcanoes.swarm.SwarmUtil;
 import gov.usgs.volcanoes.swarm.Throbber;
+import gov.usgs.volcanoes.swarm.Workers;
 import gov.usgs.volcanoes.swarm.chooser.DataChooser;
 import gov.usgs.volcanoes.swarm.data.RsamSource;
 import gov.usgs.volcanoes.swarm.data.SeismicDataSource;
@@ -208,7 +209,13 @@ public class RsamRatioFrame extends JInternalFrame implements Runnable, Settings
     }
 
     spanIndex = i;
-    getRsamRatio();
+    // Toolbar clicks land here on the event thread; fetch on a worker so a slow server does not
+    // freeze the UI.
+    Workers.execute(new Runnable() {
+      public void run() {
+        getRsamRatio();
+      }
+    });
   }
 
   /**
