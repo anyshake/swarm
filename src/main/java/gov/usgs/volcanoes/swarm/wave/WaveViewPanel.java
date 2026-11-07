@@ -113,11 +113,6 @@ public class WaveViewPanel extends JComponent {
    * A flag that indicates whether data are being loaded for this panel.
    */
   protected boolean working;
-  /**
-   * The wave is rendered to an image that is only updated when the settings change for repaint
-   * efficiency.
-   */
-  protected BufferedImage image;
   private final transient Offscreen offscreen = new Offscreen();
   private transient volatile Offscreen.Painter plotPainter;
   private Plot plot;
@@ -800,9 +795,12 @@ public class WaveViewPanel extends JComponent {
     processSettings();
   }
 
-  private synchronized BufferedImage getImage() {
-    image = offscreen.displayed();
-    return image;
+  /**
+   * The last finished frame. Read without the plot lock, so a repaint does not wait while the next
+   * frame is built.
+   */
+  private BufferedImage getImage() {
+    return offscreen.displayed();
   }
 
   /**
