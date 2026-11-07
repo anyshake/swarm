@@ -14,7 +14,6 @@ import gov.usgs.volcanoes.core.legacy.plot.render.wave.SpectraRenderer;
 import gov.usgs.volcanoes.core.legacy.plot.render.wave.SpectrogramRenderer;
 import gov.usgs.volcanoes.core.math.Util;
 import gov.usgs.volcanoes.core.time.J2kSec;
-import gov.usgs.volcanoes.core.time.Time;
 import gov.usgs.volcanoes.quakeml.Pick;
 import gov.usgs.volcanoes.swarm.Icons;
 import gov.usgs.volcanoes.swarm.Metadata;
@@ -34,7 +33,6 @@ import gov.usgs.volcanoes.swarm.wave.WaveViewSettings.ViewType;
 import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Dimension;
-import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
@@ -43,18 +41,12 @@ import java.awt.Paint;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.MouseMotionListener;
-import java.awt.font.FontRenderContext;
 import java.awt.geom.GeneralPath;
 import java.awt.geom.Line2D;
 import java.awt.image.BufferedImage;
 import java.text.NumberFormat;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.TimeZone;
 import javax.swing.JComponent;
 import javax.swing.SwingUtilities;
 import javax.swing.event.EventListenerList;
@@ -145,50 +137,14 @@ public class WaveViewPanel extends JComponent {
   private static final Color UNCERTAINTY_CODA = halfAlpha(Color.YELLOW);
   private final Line2D.Double overlayLine = new Line2D.Double();
   private final GeneralPath markPath = new GeneralPath();
-  private Font labelFont;
-  private boolean labelAscentValid;
-  private int cachedLabelAscent;
-  private final HashMap<String, Integer> labelWidths = new HashMap<String, Integer>();
-  /**
-   * Context {@link Graphics2D#getFontMetrics()} measured with. It carries the fractional-metrics
-   * hint, text antialiasing (graphics antialiasing when text antialiasing is left at the default),
-   * and the transform.
-   */
-  private FontRenderContext labelMetricsContext;
 
   /** Same RGB with alpha divided by two, matching the previous per-paint constructor. */
   private static Color halfAlpha(Color color) {
     return new Color(color.getRed(), color.getGreen(), color.getBlue(), color.getAlpha() / 2);
   }
 
-  /**
-   * floor(log10) of a finite nonzero double is an integer in this range. Other exponents, including
-   * NaN and infinities, still go through Math.pow.
-   */
-  private static final int POW10_MIN = -324;
-  private static final int POW10_MAX = 308;
-  private static final double[] POW10 = new double[POW10_MAX - POW10_MIN + 1];
-
-  static {
-    for (int exponent = POW10_MIN; exponent <= POW10_MAX; exponent++) {
-      POW10[exponent - POW10_MIN] = Math.pow(10.0, exponent);
-    }
-  }
-
-  private static double pow10(double exp) {
-    if (exp >= POW10_MIN && exp <= POW10_MAX) {
-      int exponent = (int) exp;
-      if ((double) exponent == exp) {
-        return POW10[exponent - POW10_MIN];
-      }
-    }
-    return Math.pow(10.0, exp);
-  }
-
   protected boolean pauseCursorMark;
   protected double time;
-  private Wave waveInfoSource;
-  private String waveInfoText;
   private Wave filteredSource;
   private Wave filteredWave;
   private int[] filteredBuffer;
@@ -198,53 +154,6 @@ public class WaveViewPanel extends JComponent {
   private double filteredCorner1 = Double.NaN;
   private double filteredCorner2 = Double.NaN;
   private double filteredRate = Double.NaN;
-  private boolean filterTextValid;
-  private Object filterTextType;
-  private long filterCorner1Bits;
-  private long filterCorner2Bits;
-  private String filterText = "";
-  /**
-   * Cursor timestamps stay on this formatter. Mouse handling is on the event thread, so each panel
-   * keeps its own and it is not shared. A new one is built when the format locale changes.
-   */
-  private SimpleDateFormat cursorFormat;
-  private Locale cursorFormatLocale;
-  private final Date cursorDate = new Date();
-  private boolean cursorTextValid;
-  private long cursorTimeBits;
-  private TimeZone cursorZone;
-  /** Millisecond zone offset divided by 1000, the same integer division as getTimeString. */
-  private int cursorOffsetSeconds;
-  private String cursorText;
-  private final StringBuilder statusBuffer = new StringBuilder(256);
-  private boolean durationTextValid;
-  private long durationMark1Bits;
-  private long durationMark2Bits;
-  private long durationABits;
-  private long durationBBits;
-  private String durationText;
-  private boolean sampleTextValid;
-  private long sampleBits;
-  private String sampleText;
-  private boolean spectraTextValid;
-  private long spectraTimeBits;
-  private long spectraPowerBits;
-  private boolean spectraLogFrequency;
-  private boolean spectraLogPower;
-  private Locale spectraFormatLocale;
-  private String spectraText;
-  private boolean pickStatusValid;
-  private long pickSpBits;
-  private long pickCodaBits;
-  private long pickVpBits;
-  private long pickRatioBits;
-  private long pickDurationABits;
-  private long pickDurationBBits;
-  private boolean pickDurationEnabled;
-  private int pickWaveCount = -2;
-  private double[] pickCodaDurations = new double[0];
-  private double[] codaScratch = new double[0];
-  private String cachedPickStatus = "";
 
   // pick and tag data
   private PickData pickData;
@@ -708,38 +617,31 @@ public class WaveViewPanel extends JComponent {
    * @param y the mouse y position
    */
   public boolean processMousePosition(int x, int y) {
-    statusBuffer.setLength(0);
-    String unit = null;
-
-    int panelWidth = getWidth();
-    int panelHeight = getHeight();
+    StringBuilder status = new StringBuilder();
     double[] t = getTranslation();
     double previousTime = time;
     time = Double.NaN;
 
-    if (wave != null && t != null && y > yOffset && y < (panelHeight - bottomHeight)
-        && x > xOffset && x < panelWidth - rightWidth) {
+    if (wave != null && t != null && y > yOffset && y < (getHeight() - bottomHeight)
+        && x > xOffset && x < getWidth() - rightWidth) {
       time = x * t[0] + t[1];
       double yi = y * -t[2] + t[3];
 
-      statusBuffer.append(cachedWaveInfo());
+      status.append(StatusTextArea.getWaveInfo(wave));
 
       if (timeSeries) {
-
         if (swarmConfig.durationEnabled && !Double.isNaN(mark1) && !Double.isNaN(mark2)) {
-          statusBuffer.append(",");
-          statusBuffer.append(cachedDuration(mark1, mark2));
+          status.append(",").append(StatusTextArea.getDuration(mark1, mark2));
         }
 
-        String timeString = cursorTimeText(time);
+        String timeString = StatusTextArea.getTimeString(time, swarmConfig.getTimeZone(channel));
         if (timeString != null) {
-          statusBuffer.append("\n");
-          statusBuffer.append(timeString);
+          status.append("\n").append(timeString);
         }
 
         double offset = 0;
         double multiplier = 1;
-
+        String unit = null;
         if (settings.viewType == ViewType.SPECTROGRAM) {
           unit = "Frequency (Hz)";
         } else {
@@ -749,32 +651,39 @@ public class WaveViewPanel extends JComponent {
             multiplier = md.getMultiplier();
             unit = md.getUnit();
           }
-
           if (unit == null) {
             unit = "Counts";
           }
         }
         double yi2 = multiplier * yi + offset;
-        statusBuffer.append(", ");
-        statusBuffer.append(unit);
-        statusBuffer.append(": ");
-        statusBuffer.append(formatSample(yi2));
+        double exp = Util.getExp(yi2);
+        String value = (yi2 != 0.0 && (exp >= 5.0 || exp <= -5.0)
+            ? numberFormat.format(yi2 / Math.pow(10, exp)) + "e" + numberFormat.format(exp)
+            : numberFormat.format(yi2));
+        status.append(", ").append(unit).append(": ").append(value);
       } else {
-        statusBuffer.append(spectraStatus(time, yi));
+        double xi = time;
+        if (settings.viewType == ViewType.SPECTRA && settings.spectraLogFreq) {
+          xi = Math.pow(10.0, xi);
+        }
+        if (settings.viewType == ViewType.SPECTRA && settings.spectraLogPower) {
+          yi = Math.pow(10.0, yi);
+        }
+        status.append(String.format("\nFrequency (Hz): %.6f, Power: %.3f", xi, yi));
       }
 
       if (settings.pickEnabled && pickData != null) {
-        String pickStatus = cachedPickStatus();
+        String pickStatus = pickStatus();
         if (!pickStatus.isEmpty()) {
-          statusBuffer.append("\n");
-          statusBuffer.append(pickStatus);
+          status.append("\n").append(pickStatus);
         }
       }
     }
 
-    // Copy before notifying listeners so a re-entrant hover cannot clear this buffer.
-    final String statusTextValue = statusBuffer.toString();
+    final String statusTextValue = status.toString();
 
+    // Other panels repaint their cursor on every broadcast, so a hover that stays on the same time
+    // is not sent again.
     if (!pauseCursorMark && Double.compare(previousTime, time) != 0) {
       WaveViewTime.fireTimeChanged(time);
     }
@@ -791,221 +700,30 @@ public class WaveViewPanel extends JComponent {
   }
 
   /**
-   * Wave header for the status bar. Sample range and RSAM stay fixed until the wave object changes.
+   * S-P distance and coda duration, with the clipboard's average coda.
    */
-  private String cachedWaveInfo() {
-    if (wave != waveInfoSource) {
-      waveInfoSource = wave;
-      waveInfoText = StatusTextArea.getWaveInfo(wave);
-    }
-    return waveInfoText;
-  }
-
-  /**
-   * Same text as {@link StatusTextArea#getTimeString}. The formatter matches {@link Time#format}
-   * and is reused until the sample, zone, format locale, or applied offset changes. That offset is
-   * the millisecond value divided by 1000 with integer division, so a daylight-rule edit that
-   * leaves the raw offset and savings unchanged still misses.
-   */
-  private String cursorTimeText(double j2k) {
-    TimeZone zone = swarmConfig.getTimeZone(channel);
-    Locale locale = Locale.getDefault(Locale.Category.FORMAT);
-    long bits = Double.doubleToLongBits(j2k);
-    int offsetSeconds = zone.getOffset(J2kSec.asEpoch(j2k)) / 1000;
-    if (cursorTextValid && bits == cursorTimeBits && zone == cursorZone
-        && locale == cursorFormatLocale && offsetSeconds == cursorOffsetSeconds) {
-      return cursorText;
-    }
-    cursorText = formatCursorTime(j2k, zone, locale, offsetSeconds);
-    cursorTimeBits = bits;
-    cursorZone = zone;
-    cursorFormatLocale = locale;
-    cursorOffsetSeconds = offsetSeconds;
-    cursorTextValid = true;
-    return cursorText;
-  }
-
-  private String formatCursorTime(double j2k, TimeZone zone, Locale locale, int offsetSeconds) {
-    if (cursorFormat == null || cursorFormatLocale != locale) {
-      cursorFormat = new SimpleDateFormat(Time.STANDARD_TIME_FORMAT_MS, locale);
-      cursorFormat.setTimeZone(Time.DEFAULT_TIME_ZONE);
-    }
-    String utc = formatCursorEpoch(j2k);
-    if (offsetSeconds != 0) {
-      cursorDate.setTime(J2kSec.asEpoch(j2k));
-      String tza = zone.getDisplayName(zone.inDaylightTime(cursorDate), TimeZone.SHORT);
-      String local = formatCursorEpoch(j2k + offsetSeconds);
-      return local + " (" + tza + "), " + utc + " (UTC)";
-    }
-    return utc;
-  }
-
-  private String formatCursorEpoch(double j2k) {
-    cursorDate.setTime(J2kSec.asEpoch(j2k));
-    return cursorFormat.format(cursorDate);
-  }
-
-  /**
-   * Duration text for the current marks. Reused until the marks or magnitude coefficients change.
-   */
-  private String cachedDuration(double start, double end) {
-    long mark1Bits = Double.doubleToLongBits(start);
-    long mark2Bits = Double.doubleToLongBits(end);
-    long aBits = Double.doubleToLongBits(swarmConfig.durationA);
-    long bBits = Double.doubleToLongBits(swarmConfig.durationB);
-    if (!durationTextValid || mark1Bits != durationMark1Bits || mark2Bits != durationMark2Bits
-        || aBits != durationABits || bBits != durationBBits) {
-      durationText = StatusTextArea.getDuration(start, end);
-      durationMark1Bits = mark1Bits;
-      durationMark2Bits = mark2Bits;
-      durationABits = aBits;
-      durationBBits = bBits;
-      durationTextValid = true;
-    }
-    return durationText;
-  }
-
-  /** Count or frequency text. Reused while the scaled sample has the same bits. */
-  private String formatSample(double yi2) {
-    long bits = Double.doubleToLongBits(yi2);
-    if (sampleTextValid && bits == sampleBits) {
-      return sampleText;
-    }
-    double exp = Util.getExp(yi2);
-    if (yi2 != 0.0 && (exp >= 5.0 || exp <= -5.0)) {
-      sampleText = numberFormat.format(yi2 / pow10(exp)) + "e" + numberFormat.format(exp);
-    } else {
-      sampleText = numberFormat.format(yi2);
-    }
-    sampleBits = bits;
-    sampleTextValid = true;
-    return sampleText;
-  }
-
-  /**
-   * Spectra cursor line. Reused while the hovered point, log axes, and format locale stay the same.
-   * {@code -0} and {@code 0} format differently, so the key keeps their distinct bits.
-   */
-  private String spectraStatus(double time, double yi) {
-    boolean logFrequency = settings.viewType == ViewType.SPECTRA && settings.spectraLogFreq;
-    boolean logPower = settings.viewType == ViewType.SPECTRA && settings.spectraLogPower;
-    long timeBits = Double.doubleToLongBits(time);
-    long powerBits = Double.doubleToLongBits(yi);
-    Locale formatLocale = Locale.getDefault(Locale.Category.FORMAT);
-    if (spectraTextValid && timeBits == spectraTimeBits && powerBits == spectraPowerBits
-        && logFrequency == spectraLogFrequency && logPower == spectraLogPower
-        && formatLocale.equals(spectraFormatLocale)) {
-      return spectraText;
-    }
-    double xi = time;
-    if (logFrequency) {
-      xi = Math.pow(10.0, xi);
-    }
-    double power = yi;
-    if (logPower) {
-      power = Math.pow(10.0, power);
-    }
-    spectraText = String.format("\nFrequency (Hz): %.6f, Power: %.3f", xi, power);
-    spectraTimeBits = timeBits;
-    spectraPowerBits = powerBits;
-    spectraLogFrequency = logFrequency;
-    spectraLogPower = logPower;
-    spectraFormatLocale = formatLocale;
-    spectraTextValid = true;
-    return spectraText;
-  }
-
-  /**
-   * S-P and coda text. The clipboard is still visited so a changed coda cannot be missed, and the
-   * formatted line is reused when that visit sees the same durations and velocities.
-   */
-  private String cachedPickStatus() {
-    double spDuration = pickData.getSpDuration();
-    double codaDuration = pickData.getCodaDuration();
-    double vp = SwarmConfig.getInstance().pVelocity;
-    double ratio = SwarmConfig.getInstance().velocityRatio;
-    boolean durationEnabled = swarmConfig.durationEnabled;
-    double durationA = swarmConfig.durationA;
-    double durationB = swarmConfig.durationB;
-    int waveCount = -1;
-    if (durationEnabled && !Double.isNaN(codaDuration)) {
-      List<WaveViewPanel> waves = WaveClipboardFrame.getInstance().getWaves();
-      waveCount = waves.size();
-      if (codaScratch.length < waveCount) {
-        codaScratch = new double[waveCount];
-      }
-      for (int i = 0; i < waveCount; i++) {
-        codaScratch[i] = waves.get(i).pickData.getCodaDuration();
-      }
-    }
-    if (pickStatusValid && sameBits(spDuration, pickSpBits) && sameBits(codaDuration, pickCodaBits)
-        && sameBits(vp, pickVpBits) && sameBits(ratio, pickRatioBits)
-        && sameBits(durationA, pickDurationABits) && sameBits(durationB, pickDurationBBits)
-        && durationEnabled == pickDurationEnabled && waveCount == pickWaveCount
-        && sameCoda(waveCount)) {
-      return cachedPickStatus;
-    }
-    cachedPickStatus =
-        buildPickStatus(spDuration, codaDuration, vp, ratio, durationEnabled, waveCount);
-    pickSpBits = Double.doubleToLongBits(spDuration);
-    pickCodaBits = Double.doubleToLongBits(codaDuration);
-    pickVpBits = Double.doubleToLongBits(vp);
-    pickRatioBits = Double.doubleToLongBits(ratio);
-    pickDurationABits = Double.doubleToLongBits(durationA);
-    pickDurationBBits = Double.doubleToLongBits(durationB);
-    pickDurationEnabled = durationEnabled;
-    pickWaveCount = waveCount;
-    if (waveCount >= 0) {
-      if (pickCodaDurations.length < waveCount) {
-        pickCodaDurations = new double[waveCount];
-      }
-      System.arraycopy(codaScratch, 0, pickCodaDurations, 0, waveCount);
-    }
-    pickStatusValid = true;
-    return cachedPickStatus;
-  }
-
-  private static boolean sameBits(double value, long bits) {
-    return Double.doubleToLongBits(value) == bits;
-  }
-
-  private boolean sameCoda(int waveCount) {
-    if (waveCount < 0) {
-      return true;
-    }
-    if (pickCodaDurations.length < waveCount) {
-      return false;
-    }
-    for (int i = 0; i < waveCount; i++) {
-      long left = Double.doubleToLongBits(codaScratch[i]);
-      long right = Double.doubleToLongBits(pickCodaDurations[i]);
-      if (left != right) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  private String buildPickStatus(double spDuration, double codaDuration, double vp, double ratio,
-      boolean durationEnabled, int waveCount) {
+  private String pickStatus() {
     String pickStatus = "";
+    double spDuration = pickData.getSpDuration();
     if (!Double.isNaN(spDuration)) {
-      double vs = vp / ratio;
+      double vp = swarmConfig.pVelocity;
+      double vs = vp / swarmConfig.velocityRatio;
       double spDistance = spDuration * (vp * vs) / (vp - vs);
       pickStatus = String.format("S-P: %.2fs (%.2fkm)", spDuration, spDistance);
     }
-    if (durationEnabled && !Double.isNaN(codaDuration)) {
-      if (!pickStatus.equals("")) {
+    double duration = pickData.getCodaDuration();
+    if (swarmConfig.durationEnabled && !Double.isNaN(duration)) {
+      if (!pickStatus.isEmpty()) {
         pickStatus += "; ";
       }
-      double durationMagnitude = swarmConfig.getDurationMagnitude(codaDuration);
-      String coda = String.format("Coda: %.2fs (Mc: %.2f)", codaDuration, durationMagnitude);
+      String coda = String.format("Coda: %.2fs (Mc: %.2f)", duration,
+          swarmConfig.getDurationMagnitude(duration));
       int count = 0;
       double sumDuration = 0;
-      for (int i = 0; i < waveCount; i++) {
-        double one = codaScratch[i];
-        if (!Double.isNaN(one)) {
-          sumDuration += one;
+      for (WaveViewPanel wvp : WaveClipboardFrame.getInstance().getWaves()) {
+        double codaDuration = wvp.pickData.getCodaDuration();
+        if (!Double.isNaN(codaDuration)) {
+          sumDuration += codaDuration;
           count++;
         }
       }
@@ -1013,10 +731,8 @@ public class WaveViewPanel extends JComponent {
         pickStatus += coda;
       } else {
         double avgDuration = sumDuration / count;
-        double avgDurationMagnitude = swarmConfig.getDurationMagnitude(avgDuration);
-        String avgCoda =
-            String.format("Avg Coda: %.2fs (Mc: %.2f)", avgDuration, avgDurationMagnitude);
-        pickStatus += coda + ", " + avgCoda;
+        pickStatus += coda + ", " + String.format("Avg Coda: %.2fs (Mc: %.2f)", avgDuration,
+            swarmConfig.getDurationMagnitude(avgDuration));
       }
     }
     return pickStatus;
@@ -1031,7 +747,6 @@ public class WaveViewPanel extends JComponent {
    */
   public void setWave(Wave sw, double st, double et) {
     wave = sw;
-    waveInfoSource = null;
     startTime = st;
     endTime = et;
     processSettings();
@@ -1255,50 +970,6 @@ public class WaveViewPanel extends JComponent {
   }
 
   /**
-   * Label width and ascent for the current font and the context {@code FontMetrics} measures with.
-   * Cursor repaints redraw the same tags, so the measurements stay until the font or that context
-   * changes. Widths are not reused before a font is set.
-   */
-  private void ensureLabelMetrics(Graphics2D g2) {
-    Font font = g2.getFont();
-    FontRenderContext context = g2.getFontRenderContext();
-    if (font != null && labelAscentValid && font == labelFont
-        && context.equals(labelMetricsContext)) {
-      return;
-    }
-    labelFont = font;
-    labelMetricsContext = context;
-    labelWidths.clear();
-    if (font == null) {
-      labelAscentValid = false;
-      return;
-    }
-    cachedLabelAscent = g2.getFontMetrics().getAscent();
-    labelAscentValid = true;
-  }
-
-  private int labelWidth(Graphics2D g2, String text) {
-    if (g2.getFont() == null) {
-      return g2.getFontMetrics().stringWidth(text);
-    }
-    ensureLabelMetrics(g2);
-    Integer width = labelWidths.get(text);
-    if (width == null) {
-      width = Integer.valueOf(g2.getFontMetrics().stringWidth(text));
-      labelWidths.put(text, width);
-    }
-    return width.intValue();
-  }
-
-  private int labelAscent(Graphics2D g2) {
-    if (g2.getFont() == null) {
-      return g2.getFontMetrics().getAscent();
-    }
-    ensureLabelMetrics(g2);
-    return cachedLabelAscent;
-  }
-
-  /**
    * Draw pick marks.
    * 
    * @param pick pick to draw
@@ -1358,8 +1029,9 @@ public class WaveViewPanel extends JComponent {
     } else {
       g2.setColor(color);
     }
-    int width = labelWidth(g2, tag);
-    int height = labelAscent(g2);
+    FontMetrics fm = g2.getFontMetrics();
+    int width = fm.stringWidth(tag);
+    int height = fm.getAscent();
     int offset = 2;
     int lw = width + 2 * offset;
     g2.fillRect((int) x, 3, lw, height + 2 * offset);
@@ -1403,8 +1075,9 @@ public class WaveViewPanel extends JComponent {
     } else {
       g2.setColor(color);
     }
-    int width = labelWidth(g2, tag.classification);
-    int height = labelAscent(g2);
+    FontMetrics fm = g2.getFontMetrics();
+    int width = fm.stringWidth(tag.classification);
+    int height = fm.getAscent();
     int offset = 2;
     int lw = width + 2 * offset;
     g2.fillRect((int) x, 3, lw, height + 2 * offset);
@@ -1435,47 +1108,26 @@ public class WaveViewPanel extends JComponent {
    * @return text renderer
    */
   public TextRenderer getFilterLabel(int x, int y, int horizJustification, int vertJustification) {
-    TextRenderer tr = new TextRenderer(x, y, filterText());
-    tr.horizJustification = horizJustification;
-    tr.vertJustification = vertJustification;
-    tr.color = Color.red;
-    return tr;
-  }
-
-  /**
-   * Filter corner text. Map callers keep the renderer this method returns, so only the string is
-   * reused.
-   */
-  private String filterText() {
-    Object type = settings.filter.getType();
-    double corner1 = settings.filter.getCorner1();
-    double corner2 = settings.filter.getCorner2();
-    long corner1Bits = Double.doubleToLongBits(corner1);
-    long corner2Bits = Double.doubleToLongBits(corner2);
-    if (filterTextValid && filterTextType == type && filterCorner1Bits == corner1Bits
-        && filterCorner2Bits == corner2Bits) {
-      return filterText;
-    }
     String ft = "";
     switch (settings.filter.getType()) {
       case BANDPASS:
-        ft = "Band pass [" + corner1 + "-" + corner2 + " Hz]";
+        ft = "Band pass [" + settings.filter.getCorner1() + "-" + settings.filter.getCorner2()
+            + " Hz]";
         break;
       case HIGHPASS:
-        ft = "High pass [" + corner1 + " Hz]";
+        ft = "High pass [" + settings.filter.getCorner1() + " Hz]";
         break;
       case LOWPASS:
-        ft = "Low pass [" + corner1 + " Hz]";
+        ft = "Low pass [" + settings.filter.getCorner1() + " Hz]";
         break;
       default:
         break;
     }
-    filterTextType = type;
-    filterCorner1Bits = corner1Bits;
-    filterCorner2Bits = corner2Bits;
-    filterText = ft;
-    filterTextValid = true;
-    return ft;
+    TextRenderer tr = new TextRenderer(x, y, ft);
+    tr.horizJustification = horizJustification;
+    tr.vertJustification = vertJustification;
+    tr.color = Color.red;
+    return tr;
   }
 
   /**
@@ -1725,7 +1377,8 @@ public class WaveViewPanel extends JComponent {
     spectrogramRenderer.setMaxPower(settings.spectrogramMaxPower);
     spectrogramRenderer.setMinPower(settings.spectrogramMinPower);
 
-    spectrogramRenderer.setBinSize(ceilPowerOfTwo(settings.binSize * wave.getSamplingRate()));
+    spectrogramRenderer.setBinSize((int) Math.pow(2,
+        Math.ceil(Math.log(settings.binSize * wave.getSamplingRate()) / Math.log(2))));
 
     if (channel != null && displayTitle) {
       spectrogramRenderer.setTitle(channel);
@@ -1850,19 +1503,6 @@ public class WaveViewPanel extends JComponent {
     }
 
     translation = null;
-  }
-
-  /**
-   * Smallest power of two greater than or equal to the sample count.
-   */
-  private static int ceilPowerOfTwo(double samples) {
-    // highestOneBit matches pow(2, ceil(log2)) only through 2^28.
-    if (!(samples >= 1.0) || samples > (1 << 28)) {
-      return (int) Math.pow(2.0, Math.ceil(Math.log(samples) / Math.log(2.0)));
-    }
-    int rounded = (int) Math.ceil(samples);
-    int bin = Integer.highestOneBit(rounded);
-    return bin < rounded ? bin << 1 : bin;
   }
 
   /**
