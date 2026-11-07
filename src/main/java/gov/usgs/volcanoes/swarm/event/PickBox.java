@@ -149,7 +149,6 @@ public class PickBox extends JPanel implements Scrollable, PickToolBarListener {
           }
         }
         lastClickedIndex = thisIndex;
-        // event.notifyObservers();
         validate();
         repaint();
       }

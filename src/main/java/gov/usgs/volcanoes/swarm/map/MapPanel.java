@@ -211,7 +211,6 @@ public class MapPanel extends JPanel {
   private int missing;
 
   private final Set<MapMiniPanel> selectedPanels;
-  // private final boolean allowMultiSelection = false;
 
   private double startTime;
   private double endTime;
@@ -387,11 +386,6 @@ public class MapPanel extends JPanel {
 
     addKeyListener(new KeyListener() {
       public void keyPressed(final KeyEvent e) {
-        /*
-         * if (allowMultiSelection && e.isControlDown() && e.getKeyCode() == KeyEvent.VK_A) {
-         * deselectAllPanels(); synchronized (visiblePanels) { for (final MapMiniPanel panel :
-         * visiblePanels) { if (panel.isWaveVisible()) { addSelectedPanel(panel); } } } }
-         */
         if (e.isShiftDown() && e.getKeyCode() == KeyEvent.VK_R) {
           resetAllAutoScaleMemory();
         }
@@ -418,10 +412,6 @@ public class MapPanel extends JPanel {
         if (panel.isWaveVisible()) {
           cnt++;
           final WaveViewPanel p = new WaveViewPanel(panel.getWaveViewPanel());
-          // final SeismicDataSource src = panel.getWaveViewPanel().getDataSource();
-          // if (src != null) {
-          // p.setDataSource(src);
-          // }
           cb.addWave(p);
         }
       }
@@ -460,9 +450,6 @@ public class MapPanel extends JPanel {
    * @param p map mini panel
    */
   public synchronized void addSelectedPanel(final MapMiniPanel p) {
-    /*
-     * if (allowMultiSelection) { p.setSelected(true); selectedPanels.add(p); } else
-     */
     setSelectedPanel(p);
   }
 
@@ -956,7 +943,7 @@ public class MapPanel extends JPanel {
             Point pt = null;
             if (cmp.getPosition() == Position.MANUAL_UNSET) {
               final Point2D.Double mp = cmp.getManualPosition();
-              final Point2D.Double xy2 = mp;// getXY(mp.x, mp.y);
+              final Point2D.Double xy2 = mp;
               locX = (int) xy2.x;
               locY = (int) xy2.y;
               cmp.setPosition(Position.MANUAL_SET);

@@ -319,7 +319,6 @@ public class WebServicesPanel extends DataSourcePanel implements WebServiceConst
 
     builder.append(gulperSize);
     builder.append(" minutes");
-    // builder.append("Gulp delay:");
     builder.nextLine();
     builder.append("");
     builder.append("Channel");
@@ -568,7 +567,6 @@ public class WebServicesPanel extends DataSourcePanel implements WebServiceConst
         return; // no change
       }
       network.removeItem(NEED_UPDATE);
-      // boolean found = false;
       int netidx = -1;
       for (int i = 0; i < network.getItemCount(); i++) {
         item = network.getItemAt(i);

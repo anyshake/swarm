@@ -161,7 +161,6 @@ public class EventDialog extends SwarmFrame {
 
     mainPanel = new JPanel(new BorderLayout());
     this.add(mainPanel);
-    // super.createUi();
 
     FormLayout layout = new FormLayout("left:75dlu, 5dlu, 140dlu, 3dlu, 10dlu");
     DefaultFormBuilder builder = new DefaultFormBuilder(layout).border(Borders.DIALOG);
@@ -242,7 +241,6 @@ public class EventDialog extends SwarmFrame {
           hypo71InputFile.setText(filename);
           hypo71Output = "";
         }
-        // requestFocus();
       }
     });
     builder.append(openInputFileButton);
@@ -283,32 +281,26 @@ public class EventDialog extends SwarmFrame {
     builder.appendSeparator("Hypo71 Output");
 
     location = new JTextField();
-    // location.setBorder(null);
     location.setEditable(false);
     builder.append("Location", location);
     builder.nextLine();
     magnitude = new JTextField();
-    // magnitude.setBorder(null);
     magnitude.setEditable(false);
     builder.append("Magnitude", magnitude);
     builder.nextLine();
     rms = new JTextField();
-    // rms.setBorder(null);
     rms.setEditable(false);
     builder.append("RMS", rms);
     builder.nextLine();
     gap = new JTextField();
-    // gap.setBorder(null);
     gap.setEditable(false);
     builder.append("GAP", gap);
     builder.nextLine();
     erh = new JTextField();
-    // erh.setBorder(null);
     erh.setEditable(false);
     builder.append("ERH", erh);
     builder.nextLine();
     erz = new JTextField();
-    // erz.setBorder(null);
     erz.setEditable(false);
     builder.append("ERZ", erz);
     builder.nextLine();
@@ -571,7 +563,6 @@ public class EventDialog extends SwarmFrame {
         JOptionPane.showMessageDialog(Swarm.getApplicationFrame(), message, title,
             JOptionPane.INFORMATION_MESSAGE);
       }
-      // requestFocus();
       PhaseRecord endRecord = new PhaseRecord();
       endRecord.setMSTA("    ");
       hypo71Mgr.phaseRecordsList.add(endRecord);
@@ -973,12 +964,8 @@ public class EventDialog extends SwarmFrame {
       }
     }
     if (hasPicks) {
-      //usePicks.setEnabled(true);
-      //crustalModelFile.setEnabled(true);
       usePicks.setSelected(true);
     } else {
-      //usePicks.setEnabled(false);
-      //crustalModelFile.setEnabled(false);
       useInputFile.setSelected(true);
     }
      

@@ -22,8 +22,6 @@ import java.util.TimeZone;
  * @author Dan Cervelli
  */
 public class WaveServerSource extends SeismicDataSource {
-  // private final static Logger LOGGER = LoggerFactory.getLogger(WaveServerSource.class);
-
   private String params;
   private WaveServer waveServer;
   private int timeout = 2000;

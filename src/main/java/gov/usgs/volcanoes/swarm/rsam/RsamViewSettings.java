@@ -43,10 +43,6 @@ public class RsamViewSettings {
   protected boolean alarm;
   protected String soundFile;
 
-  /*
-   * public boolean filterOn; public Butterworth filter; public boolean zeroPhaseShift;
-   */
-
   private int spanLengthS;
   private ViewType viewType;
 
@@ -75,10 +71,6 @@ public class RsamViewSettings {
     DEFAULT_RSAM_VIEW_SETTINGS.scaleMin = 0;
     DEFAULT_RSAM_VIEW_SETTINGS.alarm = false;
     DEFAULT_RSAM_VIEW_SETTINGS.soundFile = "ding.wav";
-    /*
-     * DEFAULT_RSAM_VIEW_SETTINGS.filter = new Butterworth(); DEFAULT_RSAM_VIEW_SETTINGS.filterOn =
-     * false; DEFAULT_RSAM_VIEW_SETTINGS.zeroPhaseShift = true;
-     */
 
     List<String> candidateNames = new LinkedList<String>();
     candidateNames.add(DEFAULTS_FILENAME);
@@ -134,9 +126,6 @@ public class RsamViewSettings {
     scaleMin = s.scaleMin;
     alarm = s.alarm;
     soundFile = s.soundFile;
-    /*
-     * filterOn = s.filterOn; filter = new Butterworth(s.filter); zeroPhaseShift = s.zeroPhaseShift;
-     */
   }
 
   /**
@@ -180,14 +169,6 @@ public class RsamViewSettings {
     alarm = StringUtils.stringToBoolean(cf.getString("alarm"), DEFAULT_RSAM_VIEW_SETTINGS.alarm);
     soundFile =
         StringUtils.stringToString(cf.getString("soundFile"), DEFAULT_RSAM_VIEW_SETTINGS.soundFile);
-
-
-    // filter.set(cf.getSubConfig("filter"));
-    // filterOn =
-    // StringUtils.stringToBoolean(cf.getString("filterOn"), DEFAULT_RSAM_VIEW_SETTINGS.filterOn);
-    // zeroPhaseShift = StringUtils.stringToBoolean(cf.getString("zeroPhaseShift"),
-    // DEFAULT_RSAM_VIEW_SETTINGS.zeroPhaseShift);
-
   }
 
   /**
@@ -216,9 +197,6 @@ public class RsamViewSettings {
     cf.put(prefix + ".scaleMin", Double.toString(scaleMin));
     cf.put(prefix + ".alarm", Boolean.toString(alarm));
     cf.put(prefix + ".soundFile", soundFile);
-    // filter.save(cf, prefix + ".filter");
-    // cf.put(prefix + ".filterOn", Boolean.toString(filterOn));
-    // cf.put(prefix + ".zeroPhaseShift", Boolean.toString(zeroPhaseShift));
   }
 
   public void setSpanLength(int spanLengthS) {

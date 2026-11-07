@@ -58,8 +58,6 @@ import javax.swing.event.EventListenerList;
  * @author Dan Cervelli
  */
 public class HelicorderViewPanel extends JComponent implements SwarmOptionsListener {
-  // private static final Logger LOGGER = LoggerFactory.getLogger(HelicorderViewPanel.class);
-
   private static final Color BACKGROUND_COLOR = new Color(0xf7, 0xf7, 0xf7);
   public static final long serialVersionUID = -1;
 
@@ -74,9 +72,6 @@ public class HelicorderViewPanel extends JComponent implements SwarmOptionsListe
   private static final int GRAPH_RIGHT = 1;
   private static final int ROW_HEIGHT = 2;
   private static final int GRAPH_Y = 3;
-  // private static final int MIN_TIME_LOCAL = 4;
-  // private static final int MAX_TIME_LOCAL = 5;
-  // private static final int TIME_CHUNK = 6;
   private static final int PIXEL_TIME_SPAN = 7;
 
   private Plot plot;
@@ -243,17 +238,13 @@ public class HelicorderViewPanel extends JComponent implements SwarmOptionsListe
       if (mx < heliRenderer.getGraphX() || my < heliRenderer.getGraphY()
           || mx > heliRenderer.getGraphX() + heliRenderer.getGraphWidth() - 1
           || my > heliRenderer.getGraphY() + heliRenderer.getGraphHeight() - 1) {
-        /*
-         * // removed because it wasn't helpful! if (insetWavePanel != null) { removeWaveInset();
-         * repaint(); } return;
-         */
-      } else {
-        double j2k = getMouseJ2K(mx, my);
-        processMousePosition(mx, my);
+        return;
+      }
+      double j2k = getMouseJ2K(mx, my);
+      processMousePosition(mx, my);
 
-        if (SwingUtilities.isLeftMouseButton(e)) {
-          createWaveInset(j2k, mx, my);
-        }
+      if (SwingUtilities.isLeftMouseButton(e)) {
+        createWaveInset(j2k, mx, my);
       }
     }
 
@@ -350,10 +341,6 @@ public class HelicorderViewPanel extends JComponent implements SwarmOptionsListe
           tagMenu.show(HelicorderViewPanel.this, mx, my);
         }
       }
-      /*
-       * else if (e.getButton() == MouseEvent.BUTTON3) { if (insetWavePanel != null) {
-       * removeWaveInset(); repaint(); } }
-       */
     }
 
     public void mouseReleased(MouseEvent e) {}
@@ -533,7 +520,6 @@ public class HelicorderViewPanel extends JComponent implements SwarmOptionsListe
       });
     }
 
-    // insetWavePanel.setHelicorderPanel(this);
     insetWavePanel.setMarks(startMark, endMark);
     insetWavePanel.setChannel(settings.channel);
     insetWavePanel.setDataSource(parent.getDataSource());
@@ -692,8 +678,6 @@ public class HelicorderViewPanel extends JComponent implements SwarmOptionsListe
     heliRenderer.setTimeZone(swarmConfig.getTimeZone(settings.channel));
     heliRenderer.setClipValue(settings.clipValue);
     if (minimal) {
-      // System.out.println("minimal");
-      // heliRenderer.createMinimumAxis();
       if (minimalDecorator == null) {
         minimalDecorator = new SmallDecorator();
       }
@@ -975,14 +959,8 @@ public class HelicorderViewPanel extends JComponent implements SwarmOptionsListe
       g.drawRect(0, 0, wvd.width - 1, wvd.height);
       g2.translate(-p.x, -p.y);
 
-      /*
-       * Not sure what below is meant to address. I removed the check because negative row offsets
-       * were necessary to handle multi-row highlights. If there's a problem with wave loading, find
-       * a more direct fix. --tjp
-       */
-      // fixes bug where highlight was being drawn before wave loaded
-      // if (row < 0)
-      // return;
+      // Negative row offsets are needed for multi-row highlights, so there is no row < 0 check
+      // here. If there's a problem with wave loading, find a more direct fix. --tjp
 
       // finally, draw the highlight.
       Paint pnt = g2.getPaint();

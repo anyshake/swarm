@@ -223,7 +223,6 @@ public class RsamViewSettingsDialog extends SwarmModalDialog {
     builder.add(scaleMin, cc.xyw(builder.getColumn(), builder.getRow(), 1));
     builder.nextLine();
     builder.append(alarm);
-    // builder.appendRow("center:18dlu");
     builder.nextColumn(2);
     builder.add(new JLabel("Scale Max:"),
         cc.xy(builder.getColumn(), builder.getRow(), "right, center"));
@@ -293,19 +292,6 @@ public class RsamViewSettingsDialog extends SwarmModalDialog {
         message = "Error in Scale max";
         Integer.parseInt(scaleMax.getText());
       }
-
-      message = "Error in running median period.";
-      // double rm = Double.parseDouble(runningMedianPeriod.getText());
-      message = "Error in running mean period.";
-      // double rmp = Double.parseDouble(runningMeanPeriod.getText());
-
-      message = "Error in event threshold.";
-      // double et = Double.parseDouble(eventThreshold.getText());
-      message = "Error in event ratio.";
-      // double er = Double.parseDouble(eventRatio.getText());
-      message = "Error in event maximum length.";
-      // double eml = Double.parseDouble(eventMaxLength.getText());
-
 
       return true;
     } catch (Exception e) {

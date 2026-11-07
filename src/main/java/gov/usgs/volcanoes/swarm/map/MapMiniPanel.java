@@ -94,7 +94,6 @@ public class MapMiniPanel extends JComponent
 
   // TODO: choose XY or LL positioning
   private Position position = Position.UNSET;
-  // private Point2D.Double manualPosition;
   private Point2D.Double manualPositionXy;
 
   private double[] pendingRequest;
@@ -474,7 +473,6 @@ public class MapMiniPanel extends JComponent
     }
     adjustLine();
     getParent().repaint();
-    // repaint();
   }
 
   protected void createPopup() {
@@ -624,14 +622,9 @@ public class MapMiniPanel extends JComponent
       text += ", " + activeMetadata.getHeight() + " m";
     }
     MapFrame.getInstance().setStatusText(text);
-    // setTitleBackground(MOUSEOVER_BACKGROUND);
-    // parent.setSelectedPanel(this);
   }
 
-  public void mouseExited(MouseEvent e) {
-    // setTitleBackground(NORMAL_BACKGROUND);
-    // parent.setSelectedPanel(null);
-  }
+  public void mouseExited(MouseEvent e) {}
 
   private int startX;
   private int startY;
@@ -706,7 +699,6 @@ public class MapMiniPanel extends JComponent
     Point p = getLocation();
     startX = p.x;
     startY = p.y;
-    // manualPosition = parent.getLonLat(p.x, p.y);
     manualPositionXy = new Point2D.Double(p.x, p.y);
     adjustLine();
     getParent().repaint();
@@ -760,18 +752,6 @@ public class MapMiniPanel extends JComponent
       }
     }
 
-    /*
-     * private void setLinearAxis(FrameRenderer fr, boolean log) { int hTicks = 6; double[] stt =
-     * SmartTick.autoTick(fr.getMinXAxis(), fr.getMaxXAxis(), hTicks, false, false); if (stt !=
-     * null) fr.getAxis().createVerticalGridLines(stt);
-     * 
-     * for (int i = 0; i < stt.length; i++) { TextRenderer tr = new TextRenderer(); double val =
-     * stt[i]; if (log) val = Math.pow(10, val); tr.text = String.format("%.0f", val); tr.x =
-     * (float)fr.getXPixel(stt[i]); if (tr.x >= getWidth() - 3) tr.x -= 5; tr.y = fr.getGraphY() +
-     * fr.getGraphHeight() + timeFontSize + 2; tr.color = Color.BLACK; tr.horizJustification =
-     * TextRenderer.CENTER; tr.font = font; fr.getAxis().addPostRenderer(tr); } }
-     */
-
     private void setLeftLabel(FrameRenderer fr, String label) {
       TextRenderer tr = new TextRenderer();
       tr.color = Color.BLACK;
@@ -784,7 +764,6 @@ public class MapMiniPanel extends JComponent
     }
 
     private void setMinMaxBoxes(FrameRenderer fr, double min, double max) {
-      // AxisRenderer ar = fr.getAxis();
       TextRenderer ultr = new TextRenderer();
       ultr.color = Color.BLACK;
 
@@ -838,7 +817,6 @@ public class MapMiniPanel extends JComponent
 
     public void decorateSpectra(FrameRenderer fr) {
       createAxis(fr);
-      // setLinearAxis(fr, wavePanel.getSettings().logFreq);
 
       if (wavePanel.getSettings().spectraLogPower) {
         setLeftLabel(fr, "log(P)");

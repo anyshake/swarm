@@ -116,7 +116,6 @@ public class AboutDialog extends JDialog implements Runnable {
     gcButton.addActionListener(new ActionListener() {
       public void actionPerformed(ActionEvent e) {
         System.gc();
-        // update();
         // no need to update since it will be done by thread
       }
     });

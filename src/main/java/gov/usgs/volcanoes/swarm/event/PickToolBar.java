@@ -153,8 +153,6 @@ public class PickToolBar extends JToolBar implements PickBoxListener {
     JButton clipboardButton = SwarmUtil.createToolBarButton(Icons.clipboard,
         "Send picks to clipboard", new ActionListener() {
           public void actionPerformed(ActionEvent e) {
-            // WaveClipboardFrame.getInstance().importEvent(event);
-
             // ask if user wants to clear clipboard first
             WaveClipboardFrame clipboard = WaveClipboardFrame.getInstance();
             int result = JOptionPane.showConfirmDialog(Swarm.getApplicationFrame(),

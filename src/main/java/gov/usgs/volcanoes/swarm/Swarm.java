@@ -312,15 +312,6 @@ public class Swarm extends JFrame implements InternalFrameListener {
     desktop = new JDesktopPane();
     desktop.setBorder(BorderFactory.createLineBorder(DataChooser.LINE_COLOR));
     desktop.setDragMode(JDesktopPane.OUTLINE_DRAG_MODE);
-    // disable dragging in fullscreen mode
-    /*
-     * desktop.setDesktopManager(new DefaultDesktopManager() { private static final long
-     * serialVersionUID = -1; public void beginDraggingFrame(JComponent f) { if (fullScreen) return;
-     * else super.beginDraggingFrame(f); }
-     *
-     * public void dragFrame(JComponent f, int x, int y) { if (fullScreen) return; else
-     * super.dragFrame(f, x, y); } });
-     */
     this.setSize(config.windowWidth, config.windowHeight);
     this.setLocation(config.windowX, config.windowY);
     if (config.windowMaximized) {
@@ -466,8 +457,6 @@ public class Swarm extends JFrame implements InternalFrameListener {
     }
 
     for (final JInternalFrame frame : SwarmInternalFrames.getFrames()) {
-      // Why did this check isVisible()?
-      // if (frame.isVisible() && frame instanceof Kioskable) {
       if (frame instanceof Kioskable) {
         final Kioskable f = (Kioskable) frame;
         f.setKioskMode(full);

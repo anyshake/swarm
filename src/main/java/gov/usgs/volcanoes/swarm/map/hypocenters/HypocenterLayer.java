@@ -187,8 +187,6 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
         }
       }
 
-      // int alpha = 0x80FFFFFF;
-      // renderer.paint = new Color(alpha & markerColor.getRGB(), true);
       renderer.paint = markerColor;
       renderer.renderAtOrigin(g2);
 

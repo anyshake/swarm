@@ -108,7 +108,6 @@ public class WaveServerPanel extends DataSourcePanel {
     builder.append("Tank file time zone:");
     builder.append(wsOffset, 3);
     builder.nextLine();
-    // builder.append(" minutes");
 
     panel = builder.getPanel();
   }

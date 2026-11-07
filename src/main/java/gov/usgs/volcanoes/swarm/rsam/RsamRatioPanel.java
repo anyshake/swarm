@@ -294,11 +294,6 @@ public class RsamRatioPanel extends JComponent implements SettingsListener {
 
     mr.createDefaultLineRenderers(Color.blue);
     plot.addRenderer(mr);
-
-    /*
-     * if (settings.filterOn) { plot.addRenderer(getFilterLabel(getWidth() - RIGHT_WIDTH,
-     * getHeight() - BOTTOM_HEIGHT, TextRenderer.RIGHT, TextRenderer.BOTTOM)); }
-     */
   }
 
   /**

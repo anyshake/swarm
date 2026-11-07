@@ -323,11 +323,6 @@ public class RsamViewPanel extends JComponent implements SettingsListener {
     }
 
     plot.addRenderer(mr);
-
-    /*
-     * if (settings.filterOn) { plot.addRenderer(getFilterLabel(getWidth() - RIGHT_WIDTH,
-     * getHeight() - BOTTOM_HEIGHT, TextRenderer.RIGHT, TextRenderer.BOTTOM)); }
-     */
   }
 
   /**
@@ -411,7 +406,6 @@ public class RsamViewPanel extends JComponent implements SettingsListener {
     double currentTime = data.get(data.rows() - 1, 0);
     double lastValue = data.get(data.rows() - 1, 1);
     if (lastValue >= settings.eventThreshold && currentTime > lastClipTime) {
-      // System.out.println(currentTime + " " + lastValue);
       File soundFile = new File(settings.soundFile);
       AudioInputStream audioInputStream = null;
       try {

@@ -27,8 +27,6 @@ import java.util.TimeZone;
 public class Metadata implements Comparable<Metadata> {
   public static final String DEFAULT_METADATA_FILENAME = "SwarmMetadata.config";
 
-  // private static final Logger LOGGER = LoggerFactory.getLogger(Metadata.class);
-
   private Scnl scnl;
 
   private String channel = null;
@@ -58,9 +56,6 @@ public class Metadata implements Comparable<Metadata> {
   private Set<String> groups = null;
 
   public Map<String, String> ancillaryMetadata = null;
-
-  // public Metadata()
-  // {}
 
   public Metadata(String ch) {
     updateChannel(ch);

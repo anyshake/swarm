@@ -41,7 +41,6 @@ public class MapLinePreview extends JPanel {
     }
   }
 
-  // @SuppressWarnings("serial")
   public class LinePreviewPane extends JPanel {
     Color lineColor;
 
@@ -57,7 +56,6 @@ public class MapLinePreview extends JPanel {
      */
     public void paintComponent(Graphics g) {
       Graphics2D g2 = (Graphics2D) g;
-      // System.out.println(lineColor + " : " + lineWidth);
       g2.setPaintMode();
       g2.setStroke(new BasicStroke(config.mapLineWidth));
       g2.setStroke(new BasicStroke(lineWidth));

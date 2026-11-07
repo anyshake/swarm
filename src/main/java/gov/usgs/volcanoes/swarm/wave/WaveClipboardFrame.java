@@ -980,9 +980,6 @@ public class WaveClipboardFrame extends SwarmFrame {
    */
   public synchronized void sortChannelsByPicks() {
     final WaveViewPanel panel = getSingleSelected();
-    /*
-     * if (panel == null) { return; }
-     */
 
     final ArrayList<WaveViewPanel> sorted = new ArrayList<WaveViewPanel>(waves.size());
     for (final WaveViewPanel wave : waves) {
@@ -1178,7 +1175,6 @@ public class WaveClipboardFrame extends SwarmFrame {
     }
 
     p.removeListener(selectListener);
-    // p.getDataSource().close();
     setStatusText(" ");
     waveBox.remove(i);
     waves.remove(p);
@@ -1428,10 +1424,6 @@ public class WaveClipboardFrame extends SwarmFrame {
 
   // TODO: This isn't right, this should be a method of waveviewpanel
   private void fetchNewWave(final WaveViewPanel wvp, final double nst, final double net) {
-    /*
-     * System.out.println( "Fetching new wave " + J2kSec.toDateString(nst) + " -> " +
-     * J2kSec.toDateString(net));
-     */
     final SwingWorker worker = new SwingWorker() {
       @Override
       public Object construct() {

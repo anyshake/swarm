@@ -421,8 +421,6 @@ public class SwarmConfig {
     final List<String> servers = config.getList("server");
     if (servers != null && servers.size() > 0) {
       for (final String server : servers) {
-        // SeismicDataSource sds =
-        // SeismicDataSource.getDataSource(server);
         final SeismicDataSource sds = DataSourceType.parseConfig(server);
         if (sds == null) {
           LOGGER.info("Skipping unknown data soruce " + server);
@@ -432,7 +430,6 @@ public class SwarmConfig {
       }
     } else {
       for (final String s : DEFAULT_SERVERS) {
-        // SeismicDataSource sds = SeismicDataSource.getDataSource(s);
         final SeismicDataSource sds = DataSourceType.parseConfig(s);
         sources.put(sds.getName(), sds);
       }

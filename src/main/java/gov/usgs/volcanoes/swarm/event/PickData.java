@@ -243,14 +243,6 @@ public class PickData {
     pick.setPhaseHint(phase);
     pick.setOnset(onset);
     pick.setPolarity(polarity);
-    /*
-     * if (phase.equals(P) || phase.equals(S)) { // determine polarity Wave wave = wvp.getWave();
-     * int i = wave.getBufferIndexAtTime(j2kTime); try { int value = wave.buffer[i]; int nextValue =
-     * wave.buffer[i + 1]; if (nextValue > value) { pick.setPolarity(Pick.Polarity.POSITIVE); } else
-     * if (nextValue < value) { pick.setPolarity(Pick.Polarity.NEGATIVE); } else {
-     * pick.setPolarity(Pick.Polarity.UNDECIDABLE); } } catch (ArrayIndexOutOfBoundsException e) {
-     * pick.setPolarity(Pick.Polarity.UNDECIDABLE); } }
-     */
     picks.put(phase, pick);
 
     // propagate pick

@@ -90,10 +90,6 @@ public class Hypo71Manager {
    */
   public void addStation(String name, double latitude, double longitude, double elevation,
       double delay, double fmag, double xmag, int sysNum) throws IllegalArgumentException {
-    // stationsList.add(new Station(' ', "SR01", 38, 42.55f, ' ', 122, 59.17f,
-    // ' ', 0, -0.15f, 0.4f, 0.25f, 8, 0.0f, 0.0f, 0, 0, 0));
-    // SR013842.55 12259.17 -0.15 0.40 0.25 8
-
     char ins = 'N';
     if (latitude < 0) {
       ins = 'S';
@@ -137,10 +133,6 @@ public class Hypo71Manager {
     if (pPick == null) {
       throw new IllegalArgumentException("P pick is required for phase record.");
     }
-    // phaseRecordsList.add(new PhaseRecord("SR01", "IPD0", 0.0f, 69100512, 6,
-    // 51.22f, 0.0f, "", 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, "", 0.0f, 0.0f,
-    // "1.22", 'D', "", "SR01IPD0 691005120651.22", ' ', "IPD0"));
-
     // PRMK
     String pOnset = " ";
     if (pPick.getOnset() != null) {
@@ -188,7 +180,6 @@ public class Hypo71Manager {
       useS = "USES";
     }
     // icard
-    // String icard = station + pRemark + " " + pTime;
     String icard = null;
 
     // create phase record

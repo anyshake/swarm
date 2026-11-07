@@ -101,11 +101,7 @@ public class DataChooser extends JPanel {
   private static final long serialVersionUID = 1L;
   private static final String OPENING_MESSAGE = Messages.getString("DataChooser.treeOpening"); //$NON-NLS-1$
 
-  private static final String[] TIME_VALUES = new String[] { "Now" }; // "Today (Local)",
-                                                                      // "Today (UTC)",
-                                                                      // "Yesterday (Local)",
-                                                                      // "Yesterday (UTC)"
-                                                                      // };
+  private static final String[] TIME_VALUES = new String[] { "Now" };
 
   private static final int MAX_CHANNELS_AT_ONCE = 500;
   public static final Color LINE_COLOR = new Color(0xac, 0xa8, 0x99);
@@ -728,7 +724,6 @@ public class DataChooser extends JPanel {
       MapFrame.getInstance().reset(false);
       sds.close();
     } catch (Exception e) {
-      // e.printStackTrace();
     }
     return channels;
   }
@@ -1018,11 +1013,8 @@ public class DataChooser extends JPanel {
       return;
     }
 
-    // DLN: Removed in 2.7.2 as it does not appear to be thread safe and will
-    // throw an Exception when many files are opened simultaneously.
-    //
-    // SwingUtilities.invokeLater(new Runnable() {
-    // public void run() {
+    // DLN: SwingUtilities.invokeLater was removed here in 2.7.2 as it does not appear to be thread
+    // safe and will throw an Exception when many files are opened simultaneously.
     TreeMap<String, GroupNode> rootMap = new TreeMap<String, GroupNode>();
     HashMap<String, GroupNode> groupMap = new HashMap<String, GroupNode>();
     HashSet<GroupNode> openGroups = new HashSet<GroupNode>();
@@ -1109,8 +1101,6 @@ public class DataChooser extends JPanel {
       dataTree.expandPath(new TreePath(allNode.getPath()));
     }
     nearestList.repaint();
-    // }
-    // });
   }
 
   /**

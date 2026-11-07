@@ -62,7 +62,6 @@ public class EditDataSourceDialog extends SwarmModalDialog {
     panels = new ArrayList<DataSourcePanel>();
     panels.add(new WwsPanel());
     panels.add(new WaveServerPanel());
-    // panels.add(new DHIPanel());
     panels.add(new WebServicesPanel());
     panels.add(new SeedLinkPanel());
     panels.add(new LocalFilePanel(this));

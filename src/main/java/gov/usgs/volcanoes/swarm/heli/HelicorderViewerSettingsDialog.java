@@ -73,8 +73,6 @@ public class HelicorderViewerSettingsDialog extends SwarmModalDialog {
   private static HelicorderViewerSettingsDialog dialog;
 
   private HelicorderViewerSettingsDialog() {
-    // super(Swarm.getApplication(), "Helicorder View Settings", true,
-    // WIDTH, HEIGHT);
     super(Swarm.getApplicationFrame(), "Helicorder View Settings");
     utcDateFormat = new SimpleDateFormat("yyyyMMddHHmm");
     utcDateFormat.setTimeZone(TimeZone.getTimeZone("GMT"));
@@ -97,7 +95,6 @@ public class HelicorderViewerSettingsDialog extends SwarmModalDialog {
     }
 
     dialog.setSettings(s, s2);
-    // dialog.setToCurrent();
     return dialog;
   }
 
@@ -379,8 +376,6 @@ public class HelicorderViewerSettingsDialog extends SwarmModalDialog {
       settings.showClip = showClip.isSelected();
       settings.alertClip = alertClip.isSelected();
       settings.alertClipTimeout = Integer.parseInt(alertClipTimeout.getText()) * 60;
-
-      // Calibration cb = Swarm.getParentFrame().getCalibration(channel);
 
       settings.clipValue = Double.parseDouble(clipValue.getText());
       settings.autoScale = autoScale.isSelected();

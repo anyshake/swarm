@@ -159,14 +159,8 @@ public class WwsSource extends SeismicDataSource implements RsamSource {
       try {
         scnl = Scnl.parse(station, delimiter);
         fireHelicorderProgress(station, -1);
-        // winstonClient.setReadListener(new ReadListener() {
-        // public void readProgress(double p) {
-        // fireHelicorderProgress(station, p);
-        // }
-        // });
         TimeSpan timeSpan = TimeSpan.fromJ2kSec(t1, t2);
         hd = winstonClient.getHelicorder(scnl, timeSpan, compress);
-        // winstonClient.setReadListener(null);
         fireHelicorderProgress(station, 1.0);
       } catch (UtilException e) {
         System.err.println("WWSSource.getHelicorder: Cannot parse SCNL '" + station + "'.");
