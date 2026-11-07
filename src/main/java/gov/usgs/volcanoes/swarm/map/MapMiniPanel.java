@@ -402,6 +402,7 @@ public class MapMiniPanel extends JComponent
         Wave cw = wavePanel.getWave();
         // TODO: unify this and the monitor code
         if (cw != null && cw.numSamples() > 0 && cw.overlaps(st, et)) {
+          boolean before = activeMetadata.source.isUseCache();
           activeMetadata.source.setUseCache(false);
 
           if (cw.getEndTime() < et) {
@@ -422,7 +423,6 @@ public class MapMiniPanel extends JComponent
 
           cw = cw.subset(st, Math.min(et, cw.getEndTime()));
 
-          boolean before = activeMetadata.source.isUseCache();
           activeMetadata.source.setUseCache(before);
         } else {
           cw = null;
