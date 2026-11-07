@@ -344,8 +344,10 @@ public class SeedLinkSource extends SeismicDataSource {
    * @see gov.usgs.volcanoes.swarm.data.SeismicDataSource#notifyDataNotNeeded (java.lang.String,
    *      double, double, gov.usgs.volcanoes.swarm.data.GulperListener)
    */
-  public synchronized void notifyDataNotNeeded(String station, double t1, double t2,
+  public void notifyDataNotNeeded(String station, double t1, double t2,
       GulperListener gl) {
+    // Not synchronized: a helicorder fetch holds the source lock while it waits on the server, and
+    // this runs on the EDT when a viewer closes.
     if (!CLOSE_WHEN_DATA_NOT_NEEDED) {
       return;
     }
