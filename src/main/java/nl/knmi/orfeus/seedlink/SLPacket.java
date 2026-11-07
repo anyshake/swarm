@@ -211,15 +211,19 @@ public class SLPacket {
 
         try {
 
-            // parse the record
-            DataInputStream seedIn = new DataInputStream(new ByteArrayInputStream(msrecord));
-            seedDirector.construct(seedIn);
+            // JavaSeed keeps its containers in a process-wide factory that every client resets,
+            // so decoding runs under the factory's lock (Swarm runs one client per channel).
+            synchronized (edu.iris.Fissures.seed.container.BlocketteDecoratorFactory.class) {
+                // parse the record
+                DataInputStream seedIn = new DataInputStream(new ByteArrayInputStream(msrecord));
+                seedDirector.construct(seedIn);
 
-            // extract first blockette
-            SeedObjectContainer container = (SeedObjectContainer) seedBuilder.getContainer();
-            int numElem = container.iterate(); // all Blockettes
-            //System.out.println("num elements in packet = " + numElem);
-            this.blockette = (Blockette) container.getNext();
+                // extract first blockette
+                SeedObjectContainer container = (SeedObjectContainer) seedBuilder.getContainer();
+                int numElem = container.iterate(); // all Blockettes
+                //System.out.println("num elements in packet = " + numElem);
+                this.blockette = (Blockette) container.getNext();
+            }
 
             // reset the volume counter
             // 20130207 - Bug fix by Kevin Frechette <k.frechette@isti.com>

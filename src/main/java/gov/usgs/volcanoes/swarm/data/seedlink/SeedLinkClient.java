@@ -424,7 +424,10 @@ public class SeedLinkClient implements Runnable, SwarmConst, TimeConstants {
         do {
           // ensure the blockette is created if needed, before the volume counter resets
           final int packetType = slpack.getType();
-          BlocketteDecoratorFactory.reset();
+          // the factory is shared by every client; SLPacket decodes under the same lock
+          synchronized (BlocketteDecoratorFactory.class) {
+            BlocketteDecoratorFactory.reset();
+          }
           try {
             // do something with packet
             boolean terminate = packetHandler(count, slpack, packetType);
