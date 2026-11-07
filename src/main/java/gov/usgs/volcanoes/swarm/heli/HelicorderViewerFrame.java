@@ -1125,41 +1125,58 @@ public class HelicorderViewerFrame extends SwarmFrame implements Kioskable {
 
           final Double before = end - settings.span * 60;
           final int tc = 30;
+          final double after = end;
+          final int plotWidth = width;
+          final int plotHeight = height;
+          final boolean largeChannel = includeChannel.isSelected();
+          final boolean postScript = fileFormatCb.getSelectedItem().equals("PS");
 
-          // TODO: this should use existing data.
-          final HelicorderData heliData =
-              dataSource.getHelicorder(settings.channel, before - tc, end + tc, null);
-          final HelicorderRenderer heliRenderer =
-              new HelicorderRenderer(heliData, settings.timeChunk);
-          if (swarmConfig.heliColors != null) {
-            heliRenderer.setDefaultColors(swarmConfig.heliColors); // DCK: add configured colors
-          }
+          // The source can wait on its server here, so fetch and write off the event thread.
+          throbber.increment();
+          Workers.execute(new Runnable() {
+            public void run() {
+              try {
+                // TODO: this should use existing data.
+                final HelicorderData heliData =
+                    dataSource.getHelicorder(settings.channel, before - tc, after + tc, null);
+                final HelicorderRenderer heliRenderer =
+                    new HelicorderRenderer(heliData, settings.timeChunk);
+                if (swarmConfig.heliColors != null) {
+                  // DCK: add configured colors
+                  heliRenderer.setDefaultColors(swarmConfig.heliColors);
+                }
 
-          heliRenderer.setChannel(settings.channel);
-          heliRenderer.setLocation(HelicorderViewPanel.X_OFFSET, HelicorderViewPanel.Y_OFFSET,
-              width - HelicorderViewPanel.X_OFFSET - HelicorderViewPanel.RIGHT_WIDTH,
-              height - HelicorderViewPanel.Y_OFFSET - HelicorderViewPanel.BOTTOM_HEIGHT);
-          heliRenderer.setHelicorderExtents(before, end, -1 * Math.abs(settings.barRange),
-              Math.abs(settings.barRange));
-          heliRenderer.setTimeZone(swarmConfig.getTimeZone(settings.channel));
-          heliRenderer.setForceCenter(settings.forceCenter);
-          heliRenderer.setClipBars(settings.clipBars);
-          heliRenderer.setShowClip(settings.showClip);
-          heliRenderer.setClipValue(settings.clipValue);
-          heliRenderer.setChannel(settings.channel);
-          heliRenderer.setLargeChannelDisplay(includeChannel.isSelected());
-          heliRenderer.createDefaultAxis();
-          plot.addRenderer(heliRenderer);
+                heliRenderer.setChannel(settings.channel);
+                heliRenderer.setLocation(HelicorderViewPanel.X_OFFSET,
+                    HelicorderViewPanel.Y_OFFSET,
+                    plotWidth - HelicorderViewPanel.X_OFFSET - HelicorderViewPanel.RIGHT_WIDTH,
+                    plotHeight - HelicorderViewPanel.Y_OFFSET - HelicorderViewPanel.BOTTOM_HEIGHT);
+                heliRenderer.setHelicorderExtents(before, after, -1 * Math.abs(settings.barRange),
+                    Math.abs(settings.barRange));
+                heliRenderer.setTimeZone(swarmConfig.getTimeZone(settings.channel));
+                heliRenderer.setForceCenter(settings.forceCenter);
+                heliRenderer.setClipBars(settings.clipBars);
+                heliRenderer.setShowClip(settings.showClip);
+                heliRenderer.setClipValue(settings.clipValue);
+                heliRenderer.setChannel(settings.channel);
+                heliRenderer.setLargeChannelDisplay(largeChannel);
+                heliRenderer.createDefaultAxis();
+                plot.addRenderer(heliRenderer);
 
-          if (fileFormatCb.getSelectedItem().equals("PS")) {
-            plot.writePS(f.getAbsolutePath());
-          } else {
-            try {
-              plot.writePNG(f.getAbsolutePath());
-            } catch (final PlotException e1) {
-              e1.printStackTrace();
+                if (postScript) {
+                  plot.writePS(f.getAbsolutePath());
+                } else {
+                  try {
+                    plot.writePNG(f.getAbsolutePath());
+                  } catch (final PlotException e1) {
+                    e1.printStackTrace();
+                  }
+                }
+              } finally {
+                throbber.decrement();
+              }
             }
-          }
+          });
         }
 
         swarmConfig.lastPath = f.getParent();
