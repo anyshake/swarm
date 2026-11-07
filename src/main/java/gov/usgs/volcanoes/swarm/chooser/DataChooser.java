@@ -484,19 +484,13 @@ public class DataChooser extends JPanel {
     heliButton.setToolTipText(Messages.getString("DataChooser.heliButtonToolTip")); //$NON-NLS-1$
     heliButton.addActionListener(new ActionListener() {
       public void actionPerformed(ActionEvent e) {
-        SwingWorker worker = new SwingWorker() {
-          public Object construct() {
-            List<Pair<ServerNode, String>> channels = getSelections();
-            if (channels != null) {
-              double j2k = getTime();
-              for (Pair<ServerNode, String> pair : channels) {
-                Swarm.openHelicorder(pair.item1.getSource(), pair.item2, j2k);
-              }
-            }
-            return null;
+        List<Pair<ServerNode, String>> channels = getSelections();
+        if (channels != null) {
+          double j2k = getTime();
+          for (Pair<ServerNode, String> pair : channels) {
+            Swarm.openHelicorder(pair.item1.getSource(), pair.item2, j2k);
           }
-        };
-        worker.start();
+        }
       }
     });
 
@@ -505,18 +499,12 @@ public class DataChooser extends JPanel {
     realtimeButton.setToolTipText(Messages.getString("DataChooser.waveButtonToolTip")); //$NON-NLS-1$
     realtimeButton.addActionListener(new ActionListener() {
       public void actionPerformed(ActionEvent e) {
-        SwingWorker worker = new SwingWorker() {
-          public Object construct() {
-            List<Pair<ServerNode, String>> channels = getSelections();
-            if (channels != null) {
-              for (Pair<ServerNode, String> pair : channels) {
-                Swarm.openRealtimeWave(pair.item1.getSource(), pair.item2, null);
-              }
-            }
-            return null;
+        List<Pair<ServerNode, String>> channels = getSelections();
+        if (channels != null) {
+          for (Pair<ServerNode, String> pair : channels) {
+            Swarm.openRealtimeWave(pair.item1.getSource(), pair.item2, null);
           }
-        };
-        worker.start();
+        }
       }
     });
 
@@ -526,18 +514,12 @@ public class DataChooser extends JPanel {
     rsamButton.setToolTipText(Messages.getString("DataChooser.rsamButtonToolTip")); //$NON-NLS-1$
     rsamButton.addActionListener(new ActionListener() {
       public void actionPerformed(ActionEvent e) {
-        SwingWorker worker = new SwingWorker() {
-          public Object construct() {
-            List<Pair<ServerNode, String>> channels = getSelections();
-            if (channels != null) {
-              for (Pair<ServerNode, String> pair : channels) {
-                Swarm.openRsam(pair.item1.getSource(), pair.item2);
-              }
-            }
-            return null;
+        List<Pair<ServerNode, String>> channels = getSelections();
+        if (channels != null) {
+          for (Pair<ServerNode, String> pair : channels) {
+            Swarm.openRsam(pair.item1.getSource(), pair.item2);
           }
-        };
-        worker.start();
+        }
       }
     });
 
@@ -546,25 +528,19 @@ public class DataChooser extends JPanel {
     clipboardButton.setToolTipText(Messages.getString("DataChooser.clipboardButtonToolTip")); //$NON-NLS-1$
     clipboardButton.addActionListener(new ActionListener() {
       public void actionPerformed(ActionEvent e) {
-        SwingWorker worker = new SwingWorker() {
-          public Object construct() {
-            List<Pair<ServerNode, String>> channels = getSelections();
-            if (channels != null) {
-              Collections.sort(channels, new Comparator<Pair<ServerNode, String>>() {
-                public int compare(Pair<ServerNode, String> o1, Pair<ServerNode, String> o2) {
-                  return o1.item2.compareTo(o2.item2);
-                }
-              });
-
-              for (Pair<ServerNode, String> pair : channels) {
-                Swarm.loadClipboardWave(pair.item1.getSource(), pair.item2);
-              }
+        List<Pair<ServerNode, String>> channels = getSelections();
+        if (channels != null) {
+          Collections.sort(channels, new Comparator<Pair<ServerNode, String>>() {
+            public int compare(Pair<ServerNode, String> o1, Pair<ServerNode, String> o2) {
+              return o1.item2.compareTo(o2.item2);
             }
-            WaveClipboardFrame.getInstance().requestFocusInWindow();
-            return null;
+          });
+
+          for (Pair<ServerNode, String> pair : channels) {
+            Swarm.loadClipboardWave(pair.item1.getSource(), pair.item2);
           }
-        };
-        worker.start();
+        }
+        WaveClipboardFrame.getInstance().requestFocusInWindow();
       }
     });
 
@@ -573,18 +549,12 @@ public class DataChooser extends JPanel {
     monitorButton.setToolTipText(Messages.getString("DataChooser.monitorButtonToolTip")); //$NON-NLS-1$
     monitorButton.addActionListener(new ActionListener() {
       public void actionPerformed(ActionEvent e) {
-        SwingWorker worker = new SwingWorker() {
-          public Object construct() {
-            List<Pair<ServerNode, String>> channels = getSelections();
-            if (channels != null) {
-              for (Pair<ServerNode, String> pair : channels) {
-                SwarmMultiMonitors.monitorChannelSelected(pair.item1.getSource(), pair.item2);
-              }
-            }
-            return null;
+        List<Pair<ServerNode, String>> channels = getSelections();
+        if (channels != null) {
+          for (Pair<ServerNode, String> pair : channels) {
+            SwarmMultiMonitors.monitorChannelSelected(pair.item1.getSource(), pair.item2);
           }
-        };
-        worker.start();
+        }
       }
     });
 
@@ -593,36 +563,30 @@ public class DataChooser extends JPanel {
     mapButton.setToolTipText("Open map interface");
     mapButton.addActionListener(new ActionListener() {
       public void actionPerformed(ActionEvent e) {
-        SwingWorker worker = new SwingWorker() {
-          public Object construct() {
-            List<Pair<ServerNode, String>> channels = getSelections();
-            GeoRange gr = new GeoRange();
-            int nc = 0;
-            if (channels != null) {
-              for (Pair<ServerNode, String> pair : channels) {
-                Metadata md = SwarmConfig.getInstance().getMetadata(pair.item2);
-                Point2D.Double pt = md.getLonLat();
-                if (pt != null && !Double.isNaN(pt.x) && !Double.isNaN(pt.y) && pt.x != -999.0
-                    && pt.y != -999.0) {
-                  nc++;
-                  gr.includePoint(pt, 0.0001);
-                }
-              }
+        List<Pair<ServerNode, String>> channels = getSelections();
+        GeoRange gr = new GeoRange();
+        int nc = 0;
+        if (channels != null) {
+          for (Pair<ServerNode, String> pair : channels) {
+            Metadata md = SwarmConfig.getInstance().getMetadata(pair.item2);
+            Point2D.Double pt = md.getLonLat();
+            if (pt != null && !Double.isNaN(pt.x) && !Double.isNaN(pt.y) && pt.x != -999.0
+                && pt.y != -999.0) {
+              nc++;
+              gr.includePoint(pt, 0.0001);
             }
-            if (nc == 1) {
-              gr.pad(0.1275, 0.1275);
-            } else {
-              gr.padPercent(1.2, 1.2);
-            }
-            if (gr.isValid()) {
-              MapFrame mapFrame = MapFrame.getInstance();
-              mapFrame.setVisible(true);
-              mapFrame.setView(gr);
-            }
-            return null;
           }
-        };
-        worker.start();
+        }
+        if (nc == 1) {
+          gr.pad(0.1275, 0.1275);
+        } else {
+          gr.padPercent(1.2, 1.2);
+        }
+        if (gr.isValid()) {
+          MapFrame mapFrame = MapFrame.getInstance();
+          mapFrame.setVisible(true);
+          mapFrame.setView(gr);
+        }
       }
     });
 
