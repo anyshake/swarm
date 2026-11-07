@@ -10,6 +10,7 @@ import gov.usgs.volcanoes.core.data.RSAMData;
 import gov.usgs.volcanoes.core.data.Wave;
 import gov.usgs.volcanoes.swarm.Swarm;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -459,7 +460,9 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
   }
 
   /**
-   * Get best wave for given time range.
+   * Get best wave for given time range: a new wave with the cached samples from the one at or
+   * before t1 to the last one before t2, clamped to the data, with NO_DATA where no piece has
+   * samples. It is never a cached wave, which the data source keeps growing in place.
    * 
    * @param station channel
    * @param t1 start time
@@ -467,33 +470,42 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
    * @return
    */
   public synchronized Wave getBestWave(final String station, final double t1, final double t2) {
-    Wave wave;
     final List<CachedWave> waves = waveCache.get(station);
     if (waves == null) {
       return null;
-    } else {
-      final List<Wave> parts = new ArrayList<Wave>();
-      double minT = 1E300;
-      double maxT = -1E300;
-      for (final CachedWave cw : waves) {
-        if (cw.wave.overlaps(t1, t2)) {
-          parts.add(cw.wave);
-          minT = Math.min(minT, cw.t1);
-          maxT = Math.max(maxT, cw.t2);
-          cw.lastAccess = System.currentTimeMillis();
-        }
-      }
-
-      if (parts.size() == 1) {
-        return parts.get(0);
-      }
-
-      wave = Wave.join(parts, minT, maxT);
-      if (wave != null) {
-        wave = wave.subset(t1, t2);
+    }
+    final List<Wave> parts = new ArrayList<Wave>();
+    double minT = 1E300;
+    for (final CachedWave cw : waves) {
+      if (cw.wave.overlaps(t1, t2)) {
+        parts.add(cw.wave);
+        minT = Math.min(minT, cw.t1);
+        cw.lastAccess = System.currentTimeMillis();
       }
     }
-    return wave;
+    if (parts.isEmpty()) {
+      return null;
+    }
+
+    // the pieces sit on the first piece's sample grid from minT, as Wave.join lays them out
+    final double sr = parts.get(0).getSamplingRate();
+    int end = 0;
+    for (final Wave w : parts) {
+      end = Math.max(end, (int) Math.round((w.getStartTime() - minT) * sr) + w.numSamples());
+    }
+    final int first = Math.min(Math.max(0, (int) Math.floor((t1 - minT) * sr)), end - 1);
+    final int last = Math.max(Math.min(end, (int) Math.ceil((t2 - minT) * sr)), first + 1);
+    final int[] buffer = new int[last - first];
+    Arrays.fill(buffer, Wave.NO_DATA);
+    for (final Wave w : parts) {
+      final int at = (int) Math.round((w.getStartTime() - minT) * sr) - first;
+      final int from = Math.max(0, -at);
+      final int to = Math.min(w.numSamples(), buffer.length - at);
+      if (to > from) {
+        System.arraycopy(w.buffer, from, buffer, at + from, to - from);
+      }
+    }
+    return new Wave(buffer, minT + first / sr, sr);
   }
 
   /**
