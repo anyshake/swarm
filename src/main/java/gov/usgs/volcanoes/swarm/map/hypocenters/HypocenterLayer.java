@@ -20,11 +20,9 @@ import gov.usgs.volcanoes.swarm.map.MapPanel;
 import gov.usgs.volcanoes.swarm.map.MapPanel.ColorSetting;
 import java.awt.BasicStroke;
 import java.awt.Color;
-import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.Rectangle;
-import java.awt.RenderingHints;
 import java.awt.event.MouseEvent;
 import java.awt.geom.Ellipse2D;
 import java.awt.geom.Point2D;
@@ -33,13 +31,10 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,36 +57,6 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
   private static final Color BLUE = new Color(0, 0, 200, 200);
   private static final Color PURPLE = new Color(200, 0, 200, 200);
   private static final Color BLACK = new Color(0, 0, 0, 200);
-  private static final Color POPUP_SHADE = new Color(0, 0, 0, 128);
-  private static final BasicStroke POPUP_STROKE = new BasicStroke(1.2f);
-  private static final BasicStroke LEGEND_STROKE = new BasicStroke(1.2f);
-  private static final BasicStroke LEGEND_STROKE_BOLD = new BasicStroke(2.0f);
-  private final Ellipse2D.Float markerShape = new Ellipse2D.Float();
-  private final Ellipse2D.Double legendCircle = new Ellipse2D.Double();
-  private final Point2D.Double eventLonLat = new Point2D.Double();
-  private final Point2D.Double eventPixel = new Point2D.Double();
-  private final Rectangle hitBox = new Rectangle();
-  private final IdentityHashMap<Event, double[]> pixelCache = new IdentityHashMap<Event, double[]>();
-  private final AtomicInteger placeGeneration = new AtomicInteger();
-  private int placedGeneration = -1;
-  private GeoRange placedRange;
-  private Projection placedProjection;
-  private int placedWidth = Integer.MIN_VALUE;
-  private int placedHeight = Integer.MIN_VALUE;
-  private int placedInset = Integer.MIN_VALUE;
-  private Event popupEvent;
-  private long popupOriginTime = Long.MIN_VALUE;
-  private boolean popupHasMagnitude;
-  private long popupMagnitudeBits;
-  private String popupMagnitudeType;
-  private long popupDepthBits;
-  private String popupDescription;
-  private Font popupFont;
-  private Object popupAntialias;
-  private final List<String> popupLines = new ArrayList<String>(3);
-  private int[] popupLineSpan = new int[4];
-  private int popupWidth;
-  private int popupHeight;
 
   private final Map<String, Event> events;
   private final Map<String, Event> importedEvents;
@@ -151,31 +116,40 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
     int widthPx = panel.getGraphWidth();
     int heightPx = panel.getGraphHeight();
     int insetPx = panel.getInset();
-    final double[] ext = panel.projectedExtents();
-    final double dx = (ext[1] - ext[0]);
-    final double dy = (ext[3] - ext[2]);
+    // the same for every event, worked out at the first one on the map
+    double[] ext = null;
+    double dx = 0;
+    double dy = 0;
 
     for (final Event event : events.values()) {
       Origin origin = event.getPreferredOrigin();
       if (origin == null) {
         continue;
       }
-      eventLonLat.setLocation(origin.getLongitude(), origin.getLatitude());
-      if (!range.contains(eventLonLat)) {
+      Point2D.Double originLoc = new Point2D.Double(origin.getLongitude(), origin.getLatitude());
+      if (!range.contains(originLoc)) {
         continue;
       }
 
-      place(event, origin, projection, range, ext, dx, dy, widthPx, heightPx, insetPx);
+      final Point2D.Double xy = projection.forward(originLoc);
 
-      g2.translate(eventPixel.x, eventPixel.y);
+      if (ext == null) {
+        ext = range.getProjectedExtents(projection);
+        dx = (ext[1] - ext[0]);
+        dy = (ext[3] - ext[2]);
+      }
+      final Point2D.Double res = new Point2D.Double();
+      res.x = (((xy.x - ext[0]) / dx) * widthPx + insetPx);
+      res.y = ((1 - (xy.y - ext[2]) / dy) * heightPx + insetPx);
+
+      g2.translate(res.x, res.y);
 
       Magnitude magnitude = event.getPreferredMagnitude();
       float diameter = 5;
       if (magnitude != null) {
         diameter = getMarkerSize(magnitude.getMagnitude().getValue());
       }
-      markerShape.setFrame(0f, 0f, diameter, diameter);
-      renderer.shape = markerShape;
+      renderer.shape = new Ellipse2D.Float(0f, 0f, diameter, diameter);
 
 
       Color markerColor;
@@ -218,53 +192,13 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
       renderer.paint = markerColor;
       renderer.renderAtOrigin(g2);
 
-      g2.translate(-eventPixel.x, -eventPixel.y);
+      g2.translate(-res.x, -res.y);
     }
 
     drawPopup(g2);
     if (panel.isLegendEnabled()) {
       drawLegend(g2);
     }
-  }
-
-  /**
-   * Write this hypocenter's unclamped pixel into {@link #eventPixel}.
-   */
-  private void place(final Event event, final Origin origin, final Projection projection,
-      final GeoRange range, final double[] ext, final double dx, final double dy,
-      final int widthPx, final int heightPx, final int insetPx) {
-    final int generation = placeGeneration.get();
-    if (generation != placedGeneration || placedRange != range || placedProjection != projection
-        || placedWidth != widthPx || placedHeight != heightPx || placedInset != insetPx) {
-      pixelCache.clear();
-      placedGeneration = generation;
-      placedRange = range;
-      placedProjection = projection;
-      placedWidth = widthPx;
-      placedHeight = heightPx;
-      placedInset = insetPx;
-    }
-    final double lon = origin.getLongitude();
-    final double lat = origin.getLatitude();
-    double[] cached = pixelCache.get(event);
-    if (cached != null && Double.doubleToLongBits(cached[2]) == Double.doubleToLongBits(lon)
-        && Double.doubleToLongBits(cached[3]) == Double.doubleToLongBits(lat)) {
-      eventPixel.x = cached[0];
-      eventPixel.y = cached[1];
-      return;
-    }
-    eventLonLat.setLocation(lon, lat);
-    final Point2D.Double xy = projection.forward(eventLonLat);
-    eventPixel.x = (((xy.x - ext[0]) / dx) * widthPx + insetPx);
-    eventPixel.y = ((1 - (xy.y - ext[2]) / dy) * heightPx + insetPx);
-    if (cached == null) {
-      cached = new double[4];
-      pixelCache.put(event, cached);
-    }
-    cached[0] = eventPixel.x;
-    cached[1] = eventPixel.y;
-    cached[2] = lon;
-    cached[3] = lat;
   }
 
   private int getMarkerSize(double mag) {
@@ -285,95 +219,74 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
     Origin origin = hoverEvent.getPreferredOrigin();
     GeoRange range = panel.getRange();
     Projection projection = panel.getProjection();
-    ensurePopup(origin, g2);
+    List<String> text = generatePopupText(origin);
+
+    FontMetrics fm = g2.getFontMetrics();
+    int popupHeight = 2 * POPUP_PADDING;
+    int popupWidth = 0;
+    for (String string : text) {
+      Rectangle2D bounds = fm.getStringBounds(string, g2);
+      popupHeight += (int) (Math.ceil(bounds.getHeight()) + 2);
+      popupWidth = Math.max(popupWidth, (int) (Math.ceil(bounds.getWidth()) + 2 * POPUP_PADDING));
+    }
 
     int widthPx = panel.getGraphWidth();
     int heightPx = panel.getGraphHeight();
     int insetPx = panel.getInset();
 
-    final double[] ext = panel.projectedExtents();
+    final Point2D.Double xy =
+        projection.forward(new Point2D.Double(origin.getLongitude(), origin.getLatitude()));
+    final double[] ext = range.getProjectedExtents(projection);
     final double dx = (ext[1] - ext[0]);
     final double dy = (ext[3] - ext[2]);
+    final Point2D.Double res = new Point2D.Double();
 
-    place(hoverEvent, origin, projection, range, ext, dx, dy, widthPx, heightPx, insetPx);
+    res.x = (((xy.x - ext[0]) / dx) * widthPx + insetPx);
     int maxX = widthPx - popupWidth + POPUP_PADDING;
-    eventPixel.x = Math.min(eventPixel.x, maxX);
-    if (eventPixel.y < (insetPx + popupHeight)) {
-      eventPixel.y += popupHeight;
+    res.x = Math.min(res.x, maxX);
+
+    res.y = ((1 - (xy.y - ext[2]) / dy) * heightPx + insetPx);
+    if (res.y < (insetPx + popupHeight)) {
+      res.y += popupHeight;
     }
 
-    g2.translate(eventPixel.x, eventPixel.y);
+    g2.translate(res.x, res.y);
 
-    g2.setStroke(POPUP_STROKE);
-    g2.setColor(POPUP_SHADE);
+    g2.setStroke(new BasicStroke(1.2f));
+    g2.setColor(new Color(0, 0, 0, 128));
     g2.drawRect(0, -(popupHeight - POPUP_PADDING), popupWidth, popupHeight);
     g2.fillRect(0, -(popupHeight - POPUP_PADDING), popupWidth, popupHeight);
 
     g2.setColor(Color.WHITE);
     int baseY = POPUP_PADDING;
-    for (int i = 0; i < popupLines.size(); i++) {
-      g2.drawString(popupLines.get(i), POPUP_PADDING, -baseY);
-      baseY += popupLineSpan[i];
+    for (String string : text) {
+      g2.drawString(string, POPUP_PADDING, -baseY);
+      Rectangle2D bounds = fm.getStringBounds(string, g2);
+      baseY += (int) (Math.ceil(bounds.getHeight()) + 2);
     }
-    g2.translate(-eventPixel.x, -eventPixel.y);
+    g2.translate(-res.x, -res.y);
 
   }
 
-  /**
-   * Build the hover popup once per event. Later paints reuse the same strings and measured spans.
-   */
-  private void ensurePopup(final Origin origin, final Graphics2D g2) {
-    final Font font = g2.getFont();
-    final Object antialias = g2.getRenderingHint(RenderingHints.KEY_ANTIALIASING);
-    final Magnitude magnitude = hoverEvent.getPreferredMagnitude();
-    final boolean hasMagnitude = magnitude != null;
-    final long magnitudeBits =
-        hasMagnitude ? Double.doubleToLongBits(magnitude.getMagnitude().getValue()) : 0L;
-    final String magnitudeType = hasMagnitude ? magnitude.getType() : null;
-    final long depthBits = Double.doubleToLongBits(origin.getDepth());
-    final long originTime = origin.getTime();
-    final String description = hoverEvent.getDescription();
-    if (hoverEvent == popupEvent && originTime == popupOriginTime && font == popupFont
-        && antialias == popupAntialias && hasMagnitude == popupHasMagnitude
-        && magnitudeBits == popupMagnitudeBits && Objects.equals(magnitudeType, popupMagnitudeType)
-        && depthBits == popupDepthBits && Objects.equals(description, popupDescription)) {
-      return;
-    }
-    popupEvent = hoverEvent;
-    popupOriginTime = originTime;
-    popupFont = font;
-    popupAntialias = antialias;
-    popupHasMagnitude = hasMagnitude;
-    popupMagnitudeBits = magnitudeBits;
-    popupMagnitudeType = magnitudeType;
-    popupDepthBits = depthBits;
-    popupDescription = description;
+  private List<String> generatePopupText(Origin origin) {
+    List<String> text = new ArrayList<String>(3);
 
-    popupLines.clear();
-    if (hasMagnitude) {
-      final String mag = String.format("%.2f %s at %.2f km depth",
-          magnitude.getMagnitude().getValue(), magnitude.getType(), (origin.getDepth() / 1000));
-      popupLines.add(mag);
+    Magnitude magElement = hoverEvent.getPreferredMagnitude();
+    if (magElement != null) {
+      String mag = String.format("%.2f %s at %.2f km depth", magElement.getMagnitude().getValue(),
+          magElement.getType(), (origin.getDepth() / 1000));
+      text.add(mag);
     }
-    final String date = Time.format(Time.STANDARD_TIME_FORMAT, new Date(origin.getTime()));
-    popupLines.add(date + " UTC");
+
+    String date = Time.format(Time.STANDARD_TIME_FORMAT, new Date(origin.getTime()));
+    text.add(date + " UTC");
+
+    String description = hoverEvent.getDescription();
     if (description != null && !description.equals("")) {
-      popupLines.add(description);
+      text.add(description);
     }
 
-    if (popupLineSpan.length < popupLines.size()) {
-      popupLineSpan = new int[popupLines.size()];
-    }
-    final FontMetrics fm = g2.getFontMetrics();
-    popupHeight = 2 * POPUP_PADDING;
-    popupWidth = 0;
-    for (int i = 0; i < popupLines.size(); i++) {
-      final Rectangle2D bounds = fm.getStringBounds(popupLines.get(i), g2);
-      final int span = (int) (Math.ceil(bounds.getHeight()) + 2);
-      popupLineSpan[i] = span;
-      popupHeight += span;
-      popupWidth = Math.max(popupWidth, (int) (Math.ceil(bounds.getWidth()) + 2 * POPUP_PADDING));
-    }
+    return text;
   }
 
   /**
@@ -408,7 +321,6 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
     HypocenterSource hypocenterSource = swarmConfig.getHypocenterSource();
     if (hypocenterSource == HypocenterSource.NONE) {
       events.clear();
-      placeGeneration.incrementAndGet();
       if (MapFrame.getInstance() != null) {
         MapFrame.getInstance().repaint();
       }
@@ -449,7 +361,8 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
     int widthPx = panel.getGraphWidth();
     int heightPx = panel.getGraphHeight();
     int insetPx = panel.getInset();
-    final double[] ext = panel.projectedExtents();
+    // the same for every event
+    final double[] ext = range.getProjectedExtents(projection);
     final double dx = (ext[1] - ext[0]);
     final double dy = (ext[3] - ext[2]);
 
@@ -463,21 +376,26 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
         continue;
       }
 
-      eventLonLat.setLocation(origin.getLongitude(), origin.getLatitude());
-      if (!range.contains(eventLonLat)) {
+      Point2D.Double originLoc = new Point2D.Double(origin.getLongitude(), origin.getLatitude());
+      if (!range.contains(originLoc)) {
         continue;
       }
 
       Magnitude magnitude = event.getPreferredMagnitude();
       int markerDiameter = 5;
       if (magnitude != null) {
-        markerDiameter = getMarkerSize(magnitude.getMagnitude().getValue());
+        markerDiameter = getMarkerSize(event.getPreferredMagnitude().getMagnitude().getValue());
       }
+      final Rectangle r = new Rectangle(0, 0, markerDiameter, markerDiameter);
 
-      place(event, origin, projection, range, ext, dx, dy, widthPx, heightPx, insetPx);
+      final Point2D.Double xy =
+          projection.forward(new Point2D.Double(origin.getLongitude(), origin.getLatitude()));
+      final Point2D.Double res = new Point2D.Double();
+      res.x = (((xy.x - ext[0]) / dx) * widthPx + insetPx);
+      res.y = ((1 - (xy.y - ext[2]) / dy) * heightPx + insetPx);
 
-      hitBox.setBounds((int) eventPixel.x, (int) eventPixel.y, markerDiameter, markerDiameter);
-      if (hitBox.contains(e.getX(), e.getY())) {
+      r.translate((int) res.x, (int) res.y);
+      if (r.contains(e.getPoint())) {
         LOGGER.debug("set hover event {}", event.publicId);
         hoverEvent = event;
         handled = true;
@@ -498,7 +416,6 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
   public void add(EventSet eventSet) {
     importedEvents.putAll(eventSet);
     events.putAll(eventSet);
-    placeGeneration.incrementAndGet();
     GeoRange gr = new GeoRange();
     for (Event event : eventSet.values()) {
       Origin origin = event.getPreferredOrigin();
@@ -527,7 +444,6 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
     events.clear();
     events.putAll(source.getEventSet());
     events.putAll(importedEvents);
-    placeGeneration.incrementAndGet();
     if (MapFrame.getInstance() != null) {
       MapFrame.getInstance().repaint();
     }
@@ -557,7 +473,7 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
     if (events.containsKey(publicId)) {
       events.remove(publicId);
     }
-    placeGeneration.incrementAndGet();
+
   }
 
   /**
@@ -585,12 +501,12 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
     // legend background
     int recHeight = 90;
     int recWidth = 280;
-    g2.setStroke(LEGEND_STROKE);
+    g2.setStroke(new BasicStroke(1.2f));
     g2.setColor(WHITE);
     g2.drawRect(insetPx, insetPx + heightPx - recHeight, recWidth, recHeight);
     g2.fillRect(insetPx, insetPx + heightPx - recHeight, recWidth, recHeight);
 
-    g2.setStroke(LEGEND_STROKE_BOLD);
+    g2.setStroke(new BasicStroke(2.0f));
     g2.setColor(BLACK);
     // Depth label
     float x = insetPx + 5;
@@ -599,49 +515,49 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
     y += 15;
     int size = getMarkerSize(3);
     // < 0 km
-    legendCircle.setFrame(x, y - size / 2, size, size);
+    Ellipse2D.Double circle = new Ellipse2D.Double(x, y - size / 2, size, size);
     g2.setColor(RED);
-    g2.fill(legendCircle);
+    g2.fill(circle);
     x += size + 2;
     g2.setColor(BLACK);
     g2.drawString("< 0", x, y + size / 2);
     x += 25;
     // 0-5 km
-    legendCircle.setFrame(x, y - size / 2, size, size);
+    circle = new Ellipse2D.Double(x, y - size / 2, size, size);
     g2.setColor(ORANGE);
-    g2.fill(legendCircle);
+    g2.fill(circle);
     x += size + 2;
     g2.setColor(BLACK);
     g2.drawString("0-5", x, y + size / 2);
     x += 30;
     // 5-13 km
-    legendCircle.setFrame(x, y - size / 2, size, size);
+    circle = new Ellipse2D.Double(x, y - size / 2, size, size);
     g2.setColor(YELLOW);
-    g2.fill(legendCircle);
+    g2.fill(circle);
     x += size + 2;
     g2.setColor(BLACK);
     g2.drawString("5-13", x, y + size / 2);
     x += 35;
     // 13-20 km
-    legendCircle.setFrame(x, y - size / 2, size, size);
+    circle = new Ellipse2D.Double(x, y - size / 2, size, size);
     g2.setColor(GREEN);
-    g2.fill(legendCircle);
+    g2.fill(circle);
     x += size + 2;
     g2.setColor(BLACK);
     g2.drawString("13-20", x, y + size / 2);
     x += 40;
     // 20-40 km
-    legendCircle.setFrame(x, y - size / 2, size, size);
+    circle = new Ellipse2D.Double(x, y - size / 2, size, size);
     g2.setColor(BLUE);
-    g2.fill(legendCircle);
+    g2.fill(circle);
     x += size + 2;
     g2.setColor(BLACK);
     g2.drawString("20-40", x, y + size / 2);
     x += 40;
     // 40+ km
-    legendCircle.setFrame(x, y - size / 2, size, size);
+    circle = new Ellipse2D.Double(x, y - size / 2, size, size);
     g2.setColor(PURPLE);
-    g2.fill(legendCircle);
+    g2.fill(circle);
     x += size + 2;
     g2.setColor(BLACK);
     g2.drawString("40+", x, y + size / 2);
@@ -657,9 +573,9 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
       g2.setColor(BLACK);
       g2.drawString(Integer.toString(i), x, y + 5);
       x += 10;
-      legendCircle.setFrame(x, y - size / 2, size, size);
+      circle = new Ellipse2D.Double(x, y - size / 2, size, size);
       g2.setColor(ORANGE);
-      g2.fill(legendCircle);
+      g2.fill(circle);
       x += size + 10;
     }
   }
@@ -677,33 +593,33 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
     // legend background
     int recHeight = 50;
     int recWidth = 330;
-    g2.setStroke(LEGEND_STROKE);
+    g2.setStroke(new BasicStroke(1.2f));
     g2.setColor(WHITE);
     g2.drawRect(insetPx, insetPx + heightPx - recHeight, recWidth, recHeight);
     g2.fillRect(insetPx, insetPx + heightPx - recHeight, recWidth, recHeight);
 
     int size = getMarkerSize(3);
-    g2.setStroke(LEGEND_STROKE_BOLD);
+    g2.setStroke(new BasicStroke(2.0f));
     // 1 hour ago key
     float x = insetPx + 5;
     float y = insetPx + (heightPx - recHeight) + 2;
-    legendCircle.setFrame(x, y, size, size);
+    Ellipse2D.Double circle = new Ellipse2D.Double(x, y, size, size);
     g2.setColor(RED);
-    g2.fill(legendCircle);
+    g2.fill(circle);
     g2.setColor(BLACK);
     g2.drawString("< 1 Hour", x + size + 1, y + size);
     // 1 day ago key
     y = y + size + 5;
-    legendCircle.setFrame(x, y, size, size);
+    circle = new Ellipse2D.Double(x, y, size, size);
     g2.setColor(ORANGE);
-    g2.fill(legendCircle);
+    g2.fill(circle);
     g2.setColor(BLACK);
     g2.drawString("< 1 Day", x + size + 1, y + size);
     // 1 week ago key
     y = y + size + 5;
-    legendCircle.setFrame(x, y, size, size);
+    circle = new Ellipse2D.Double(x, y, size, size);
     g2.setColor(YELLOW);
-    g2.fill(legendCircle);
+    g2.fill(circle);
     g2.setColor(BLACK);
     g2.drawString("< 1 Week", x + size + 1, y + size);
 
@@ -717,9 +633,9 @@ public final class HypocenterLayer implements MapLayer, ConfigListener, QuakemlO
       g2.setColor(BLACK);
       g2.drawString(Integer.toString(i), x, y + 5);
       x += 10;
-      legendCircle.setFrame(x, y - size / 2, size, size);
+      circle = new Ellipse2D.Double(x, y - size / 2, size, size);
       g2.setColor(ORANGE);
-      g2.fill(legendCircle);
+      g2.fill(circle);
       x += size + 10;
     }
   }
