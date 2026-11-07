@@ -31,6 +31,9 @@ package nl.knmi.orfeus.seedlink;
  * @author  Anthony Lomax
  */
 
+import java.util.Date;
+
+
 /**
  *
  * Class of SeedLink utility methods.
@@ -54,7 +57,7 @@ public class Util {
      */
     public static double getCurrentTime() {
 	
-	return System.currentTimeMillis() / 1000.0;
+	return(((double) (new Date()).getTime()) / 1000.0);
 	
     }
     

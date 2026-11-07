@@ -181,14 +181,10 @@ public class SLState {
 	 */
 	public boolean isError() throws SeedLinkException {
 		
-		int length = SLPacket.ERRORSIGNATURE.length();
-		if (recptr - sendptr < length)
+		if (recptr - sendptr < SLPacket.ERRORSIGNATURE.length())
 			throw(new SeedLinkException("not enough bytes to determine packet type"));
 		
-		if (ASCII_COMPATIBLE && asciiBytes(databuf, sendptr, length))
-			return equalsIgnoreCaseAscii(databuf, sendptr, SLPacket.ERRORSIGNATURE);
-		
-		return((new String(databuf, sendptr, length)).equalsIgnoreCase(SLPacket.ERRORSIGNATURE));
+		return((new String(databuf, sendptr, SLPacket.ERRORSIGNATURE.length())).equalsIgnoreCase(SLPacket.ERRORSIGNATURE));
 		
 	}
 	
@@ -204,14 +200,10 @@ public class SLState {
 	 */
 	public boolean isEnd() throws SeedLinkException {
 		
-		int length = SLPacket.ENDSIGNATURE.length();
-		if (recptr - sendptr < length)
+		if (recptr - sendptr < SLPacket.ENDSIGNATURE.length())
 			throw(new SeedLinkException("not enough bytes to determine packet type"));
 		
-		if (ASCII_COMPATIBLE && asciiBytes(databuf, sendptr, length))
-			return equalsIgnoreCaseAscii(databuf, sendptr, SLPacket.ENDSIGNATURE);
-		
-		return((new String(databuf, sendptr, length)).equalsIgnoreCase(SLPacket.ENDSIGNATURE));
+		return((new String(databuf, sendptr, SLPacket.ENDSIGNATURE.length())).equalsIgnoreCase(SLPacket.ENDSIGNATURE));
 		
 	}
 	
@@ -228,14 +220,10 @@ public class SLState {
 	 */
 	public boolean packetIsInfo() throws SeedLinkException {
 		
-		int length = SLPacket.INFOSIGNATURE.length();
-		if (recptr - sendptr < length)
+		if (recptr - sendptr < SLPacket.INFOSIGNATURE.length())
 			throw(new SeedLinkException("not enough bytes to determine packet type"));
 		
-		if (ASCII_COMPATIBLE && asciiBytes(databuf, sendptr, length))
-			return equalsIgnoreCaseAscii(databuf, sendptr, SLPacket.INFOSIGNATURE);
-		
-		return((new String(databuf, sendptr, length)).equalsIgnoreCase(SLPacket.INFOSIGNATURE));
+		return((new String(databuf, sendptr, SLPacket.INFOSIGNATURE.length())).equalsIgnoreCase(SLPacket.INFOSIGNATURE));
 		
 	}
 	
@@ -283,52 +271,9 @@ public class SLState {
 		if (bytesRemaining() < bytes.length)
 			throw(new SeedLinkException("not enough bytes remaining in buffer to append new bytes"));
 		
-		System.arraycopy(bytes, 0, databuf, recptr, bytes.length);
-		recptr += bytes.length;
-		
-	}
-	
-	/** True when bytes below 128 decode to those same characters. */
-	private static final boolean ASCII_COMPATIBLE = asciiCompatibleCharset();
-	
-	private static boolean asciiCompatibleCharset() {
-		byte[] bytes = new byte[128];
 		for (int i = 0; i < bytes.length; i++)
-			bytes[i] = (byte) i;
-		String decoded = new String(bytes);
-		if (decoded.length() != bytes.length)
-			return false;
-		for (int i = 0; i < bytes.length; i++) {
-			if (decoded.charAt(i) != i)
-				return false;
-		}
-		return true;
-	}
-	
-	private static boolean asciiBytes(byte[] buf, int offset, int length) {
-		for (int i = 0; i < length; i++) {
-			if ((buf[offset + i] & 0xff) > 0x7f)
-				return false;
-		}
-		return true;
-	}
-	
-	private static boolean equalsIgnoreCaseAscii(byte[] buf, int offset, String signature) {
-		int length = signature.length();
-		for (int i = 0; i < length; i++) {
-			char left = (char) (buf[offset + i] & 0xff);
-			char right = signature.charAt(i);
-			if (left == right)
-				continue;
-			char upperLeft = Character.toUpperCase(left);
-			char upperRight = Character.toUpperCase(right);
-			if (upperLeft == upperRight)
-				continue;
-			if (Character.toLowerCase(upperLeft) == Character.toLowerCase(upperRight))
-				continue;
-			return false;
-		}
-		return true;
+			databuf[recptr++] = bytes[i];
+		
 	}
 	
 	
