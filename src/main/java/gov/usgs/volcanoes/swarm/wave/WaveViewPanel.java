@@ -126,17 +126,8 @@ public class WaveViewPanel extends JComponent {
   private static final Color DRAG_HIGHLIGHT = new Color(255, 255, 0, 128);
   private static final String[] PICK_PHASES = {PickData.P, PickData.S};
   private static final String[] CODA_PHASES = {PickData.CODA1, PickData.CODA2};
-  private static final Color UNCERTAINTY_GRAY = halfAlpha(Color.GRAY);
-  private static final Color UNCERTAINTY_P = halfAlpha(PickWavePanel.P_BACKGROUND);
-  private static final Color UNCERTAINTY_S = halfAlpha(PickWavePanel.S_BACKGROUND);
-  private static final Color UNCERTAINTY_CODA = halfAlpha(Color.YELLOW);
   private final Line2D.Double overlayLine = new Line2D.Double();
   private final GeneralPath markPath = new GeneralPath();
-
-  /** Same RGB with alpha divided by two, matching the previous per-paint constructor. */
-  private static Color halfAlpha(Color color) {
-    return new Color(color.getRed(), color.getGreen(), color.getBlue(), color.getAlpha() / 2);
-  }
 
   protected boolean pauseCursorMark;
   protected double time;
@@ -991,22 +982,20 @@ public class WaveViewPanel extends JComponent {
     // get color
     String tag = pick.getTag();
     Color color = Color.GRAY;
-    Color uncertaintyShade = UNCERTAINTY_GRAY;
     if (tag.indexOf('P') != -1) {
       color = PickWavePanel.P_BACKGROUND;
-      uncertaintyShade = UNCERTAINTY_P;
     } else if (tag.indexOf('S') != -1) {
       color = PickWavePanel.S_BACKGROUND;
-      uncertaintyShade = UNCERTAINTY_S;
     } else if (tag.indexOf('C') != -1) {
       color = Color.YELLOW;
-      uncertaintyShade = UNCERTAINTY_CODA;
     }
     g2.setColor(color);
 
     // draw uncertainty
     double uncertainty = pick.getTimeQuantity().getUncertainty();
     if (!Double.isNaN(uncertainty)) {
+      Color uncertaintyShade =
+          new Color(color.getRed(), color.getGreen(), color.getBlue(), color.getAlpha() / 2);
       g2.setColor(uncertaintyShade);
       // lowerUncertainty
       long lowTime = (long) (pick.getTime() - 1000.0 * uncertainty);
