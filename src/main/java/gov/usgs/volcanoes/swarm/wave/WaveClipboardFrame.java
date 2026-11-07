@@ -1274,12 +1274,21 @@ public class WaveClipboardFrame extends SwarmFrame {
    * Resize wave panel.
    */
   public void resizeWaves() {
+    // Size the panels here on the event thread and render a copy of the list, which the event
+    // thread and an event import change while the worker renders.
+    final WaveViewPanel[] panels;
+    synchronized (this) {
+      panels = waves.toArray(new WaveViewPanel[waves.size()]);
+    }
+    final int w = scrollPane.getViewport().getSize().width;
+    final int h = calculateWaveHeight();
+    for (final WaveViewPanel wave : panels) {
+      wave.setSize(w, h);
+    }
     final SwingWorker worker = new SwingWorker() {
       @Override
       public Object construct() {
-        final int w = scrollPane.getViewport().getSize().width;
-        for (final WaveViewPanel wave : waves) {
-          wave.setSize(w, calculateWaveHeight());
+        for (final WaveViewPanel wave : panels) {
           wave.createImage();
         }
         return null;
