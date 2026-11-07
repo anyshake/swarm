@@ -290,9 +290,9 @@ public class HelicorderViewPanel extends JComponent implements SwarmOptionsListe
     }
 
     public void delayOver() {
-      removeWaveInset();
       SwingUtilities.invokeLater(new Runnable() {
         public void run() {
+          removeWaveInset();
           parent.scroll(totalScroll);
           delay = null;
           totalScroll = 0;
