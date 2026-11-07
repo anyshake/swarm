@@ -18,7 +18,6 @@ import org.slf4j.LoggerFactory;
 import edu.sc.seis.seisFile.SeisFileException;
 import edu.sc.seis.seisFile.StringMSeedQueryReader;
 import edu.sc.seis.seisFile.mseed.DataRecord;
-import edu.sc.seis.seisFile.mseed.SeedFormatException;
 import edu.sc.seis.seisFile.mseed.SeedRecord;
 import gov.usgs.volcanoes.swarm.Version;
 
@@ -77,8 +76,6 @@ public class DataSelectReader extends StringMSeedQueryReader {
    * @param location the location or empty for the empty location code.
    * @param channel  the channel.
    * @return the query.
-   * @throws IOException         if an I/O Exception occurs.
-   * @throws SeedFormatException if SEED format error.
    * @see WebServiceUtils.EMPTY_LOC_CODE
    */
   protected String createQuery(String network, String station, String location, String channel) {
