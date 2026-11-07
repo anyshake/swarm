@@ -216,6 +216,9 @@ public class SeedLinkConnection {
      * The network socket InputStream.
      */
     protected InputStream socketInputStream = null;
+
+    /** How long a socket read waits for data, the old idle poll interval. */
+    private static final int READ_WAIT_MS = 500;
     /**
      * The network socket OutputStream.
      */
@@ -1367,7 +1370,8 @@ public class SeedLinkConnection {
                     // Reset the timeout and keepalive timers
                     state.netto_trig = -1;
                     state.keepalive_trig = -1;
-                } else {
+                } else if (bytesread == null || state.bytesRemaining() == 0) {
+                    // An empty read otherwise already waited READ_WAIT_MS for data.
                     Util.sleep(500);	// AJL added to prevent use of all CPU
                 }
             }
@@ -1489,6 +1493,8 @@ public class SeedLinkConnection {
             sock.setKeepAlive(true);
 
             sock.connect(new InetSocketAddress(host_name, nport));
+            // reads wait for data instead of polling for it
+            sock.setSoTimeout(READ_WAIT_MS);
 
             /*try {System.out.println("sock.getReceiveBufferSize: " + sock.getReceiveBufferSize());} catch (Exception e) {System.out.println(e);}
             try {System.out.println("sock.getReuseAddress: " + sock.getReuseAddress());} catch (Exception e) {System.out.println(e);}
@@ -1614,17 +1620,13 @@ public class SeedLinkConnection {
         if (resplen <= 0) {
             return (null);   	// no response requested
         }
-        // If requested, wait up to 30 seconds for a response
+        // If requested, wait up to 30 seconds for a response. Each read waits for the reply.
         byte[] bytesread = null;
-        int ackcnt = 0;                     // counter for the read loop
-        int ackpoll = 50;		    // poll at 0.05 seconds for reading
-        int ackcntmax = 30000 / ackpoll;    // 30 second wait
+        long deadline = System.currentTimeMillis() + 30000;
         while ((bytesread = receiveData(resplen, code)) != null && bytesread.length == 0) {
-            if (ackcnt > ackcntmax) {
+            if (System.currentTimeMillis() > deadline) {
                 throw (new SeedLinkException("[" + code + "] no response from SeedLink server to '" + (new String(sendbytes)) + "'"));
             }
-            Util.sleep(ackpoll);
-            ackcnt++;
         }
         if (bytesread == null) {
             throw (new SeedLinkException("[" + code + "] bad response to '" + sendbytes + "'"));
@@ -1650,14 +1652,12 @@ public class SeedLinkConnection {
 
         byte[] bytes = new byte[maxbytes];
 
-        // read up to maxbytes
+        // read up to maxbytes, waiting up to READ_WAIT_MS for the first byte
         int nbytesread = 0;
         try {
-            if (socketInputStream.available() > 0) {
-                nbytesread = socketInputStream.read(bytes);
-            }
-        } catch (IOException ioe) {
-            throw (ioe);
+            nbytesread = socketInputStream.read(bytes);
+        } catch (SocketTimeoutException timeout) {
+            nbytesread = 0;
         }
 
         // check for end or no bytes read
