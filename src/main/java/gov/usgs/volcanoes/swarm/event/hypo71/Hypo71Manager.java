@@ -143,7 +143,7 @@ public class Hypo71Manager {
       pMotion = getMotion(pPick.getPolarity());
     }
     String pWeight = " ";
-    if (pPick.getTimeQuantity().getUncertainty() != Double.NaN) {
+    if (!Double.isNaN(pPick.getTimeQuantity().getUncertainty())) {
       pWeight = getWeightFromUncertainty(pPick.getTimeQuantity().getUncertainty()) + ".00";
     }
     if (sPick != null) {
@@ -170,11 +170,11 @@ public class Hypo71Manager {
       }
       String sMotion = "N";
       if (sPick.getPolarity() != null) {
-        sMotion = getMotion(pPick.getPolarity());
+        sMotion = getMotion(sPick.getPolarity());
       }
       String sWeight = " ";
-      if (sPick.getTimeQuantity().getUncertainty() != Double.NaN) {
-        sWeight = getWeightFromUncertainty(pPick.getTimeQuantity().getUncertainty()) + ".00";
+      if (!Double.isNaN(sPick.getTimeQuantity().getUncertainty())) {
+        sWeight = getWeightFromUncertainty(sPick.getTimeQuantity().getUncertainty()) + ".00";
       }
       sRemark = sOnset + sMotion + "S" + sWeight;
       useS = "USES";
