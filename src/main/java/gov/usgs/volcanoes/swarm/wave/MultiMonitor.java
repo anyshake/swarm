@@ -523,7 +523,13 @@ public class MultiMonitor extends SwarmFrame implements Kioskable {
         throbber.close();
         selectedIndex = -1;
         timer.cancel();
-        dataSource.close();
+        final SeismicDataSource source = dataSource;
+        // A shared source locks close(), and a request from any frame can hold that lock.
+        Workers.execute(new Runnable() {
+          public void run() {
+            source.close();
+          }
+        });
         panels.clear();
         wavePanel.removeAll();
         waveMap.clear();
