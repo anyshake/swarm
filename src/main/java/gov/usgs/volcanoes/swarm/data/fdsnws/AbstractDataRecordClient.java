@@ -55,6 +55,12 @@ public abstract class AbstractDataRecordClient {
     final boolean swapNeeded = b1000.getWordOrder() == 0;
     final DecompressedData decomp =
         CODEC.decompress(type, data, dr.getHeader().getNumSamples(), swapNeeded);
+    final int[] samples = decomp.getAsInt();
+    if (samples == null) {
+      // float and double samples have no int form; a wave without samples broke every join,
+      // and the gulper then asked for the same window forever
+      throw new UnsupportedCompressionType("encoding " + type + " has no integer samples");
+    }
     final Wave wave = new Wave();
     wave.setSamplingRate(dr.getSampleRate());
     Btime btime = dh.getStartBtime();
@@ -68,7 +74,7 @@ public abstract class AbstractDataRecordClient {
     cal.set(Calendar.MILLISECOND, btime.getTenthMilli() / 10);
     double j2k = J2kSec.fromEpoch(cal.getTimeInMillis());
     wave.setStartTime(j2k);
-    wave.buffer = decomp.getAsInt();
+    wave.buffer = samples;
     wave.register();
     return wave;
   }
