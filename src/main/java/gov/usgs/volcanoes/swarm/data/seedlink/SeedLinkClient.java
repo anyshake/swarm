@@ -56,6 +56,8 @@ public class SeedLinkClient implements Runnable, SwarmConst, TimeConstants {
   private final Object dataSync = new Object();
   private final Object doneSync = new Object();
   private boolean dataFlag;
+  /** End of the newest sample received, J2K. Guarded by dataSync. */
+  private double dataEnd = Double.NEGATIVE_INFINITY;
   private boolean doneFlag;
 
   /** SeedLink server address. */
@@ -195,7 +197,7 @@ public class SeedLinkClient implements Runnable, SwarmConst, TimeConstants {
     CachedDataSource cache = CachedDataSource.getInstance();
     cache.putWave(scnl, wave);
     cache.cacheWaveAsHelicorder(scnl, wave);
-    notifyData();
+    notifyData(wave.getEndTime());
   }
 
   /**
@@ -512,9 +514,12 @@ public class SeedLinkClient implements Runnable, SwarmConst, TimeConstants {
   /**
    * Notify data is available to all waiting threads.
    */
-  private void notifyData() {
+  private void notifyData(double end) {
     synchronized (dataSync) {
       dataFlag = true;
+      if (end > dataEnd) {
+        dataEnd = end;
+      }
       dataSync.notifyAll();
     }
   }
@@ -526,6 +531,10 @@ public class SeedLinkClient implements Runnable, SwarmConst, TimeConstants {
     synchronized (doneSync) {
       doneFlag = true;
       doneSync.notifyAll();
+    }
+    // wake waitForWindow
+    synchronized (dataSync) {
+      dataSync.notifyAll();
     }
   }
 
@@ -585,6 +594,34 @@ public class SeedLinkClient implements Runnable, SwarmConst, TimeConstants {
       }
     }
     return isDone();
+  }
+
+  /**
+   * Wait until this past-data request has samples up to its end time, the run is done, or the
+   * timeout passes. A server may keep streaming past the requested end instead of ending, which
+   * left callers waiting out the whole timeout.
+   *
+   * @param timeout the maximum time to wait in milliseconds.
+   * @return true if the requested window arrived or the run is done.
+   */
+  public boolean waitForWindow(long timeout) {
+    final long deadline = System.currentTimeMillis() + timeout;
+    try {
+      synchronized (dataSync) {
+        while (!(dataEnd >= endTime) && !isDone() && isRunning()) {
+          final long left = deadline - System.currentTimeMillis();
+          if (left <= 0) {
+            break;
+          }
+          dataSync.wait(left);
+        }
+      }
+    } catch (InterruptedException ex) {
+      Thread.currentThread().interrupt();
+    }
+    synchronized (dataSync) {
+      return dataEnd >= endTime || isDone();
+    }
   }
 
   protected synchronized boolean isRunning() {

@@ -60,23 +60,22 @@ public class SeedLinkSource extends SeismicDataSource {
   /** SeedLink clients for past data. */
   private final ConcurrentHashMap<String, SeedLinkClient> clients = new ConcurrentHashMap<>();
 
-  private final DoneListener clientsDoneListener;
+  /**
+   * How long a past-data request stands before the same range may be asked for again. Matches the
+   * idle time after which a client closes itself.
+   */
+  private static final long BACKFILL_RETRY_MS = 5 * 60 * 1000L;
+
+  /** The earliest start asked of the server for each channel, and when, as {start, millis}. */
+  private final ConcurrentHashMap<String, double[]> backfills = new ConcurrentHashMap<>();
+
   private final DoneListener rtClientsDoneListener;
 
   /**
    * Default constructor.
    */
   public SeedLinkSource() {
-    // done listeners to remove clients when they are done
-    clientsDoneListener = new DoneListener() {
-      @Override
-      public void done(String station) {
-        SeedLinkClient client = clients.remove(station);
-        if (client != null) {
-          LOGGER.debug("SeedLinkSource client done: {}", client);
-        }
-      }
-    };
+    // done listener to remove real-time clients when they are done
     rtClientsDoneListener = new DoneListener() {
       @Override
       public void done(String station) {
@@ -304,24 +303,36 @@ public class SeedLinkSource extends SeismicDataSource {
    * @param t2 end time
    */
   private void getData(String scnl, double t1, double t2) {
+    // Every refresh asks for the time before the oldest cached sample. When the server has nothing
+    // older, asking again only opened another connection and waited out the timeout each time.
+    final long now = System.currentTimeMillis();
+    final double[] asked = backfills.get(scnl);
+    if (asked != null && asked[0] <= t1 && now - asked[1] < BACKFILL_RETRY_MS) {
+      return;
+    }
+    backfills.put(scnl, new double[] {t1, now});
+
     SeedLinkClient client = clients.get(scnl);
     if (client != null) {
-      client.updateLastRequestTime();
-      // wait up to 10 seconds for client to be done
-      client.waitForDone(10000);
+      // the new request starts no later, so it covers what this one was fetching
       client.closeConnection();
-      client = null;
     }
-    if (client == null) {
-      client = new SeedLinkClient(host, port, t1, t2, scnl);
-      LOGGER.debug("SeedLinkSource getData: {}", client);
-      client.setDoneListener(clientsDoneListener);
-      clients.put(scnl, client);
-      client.updateLastRequestTime();
-      client.start();
-      // wait up to 10 seconds for client to get data
-      client.waitForDone(10000);
-    }
+    final SeedLinkClient fresh = new SeedLinkClient(host, port, t1, t2, scnl);
+    LOGGER.debug("SeedLinkSource getData: {}", fresh);
+    // a closed client that finishes late must not drop the one that replaced it
+    fresh.setDoneListener(new DoneListener() {
+      @Override
+      public void done(String station) {
+        if (clients.remove(station, fresh)) {
+          LOGGER.debug("SeedLinkSource client done: {}", fresh);
+        }
+      }
+    });
+    clients.put(scnl, fresh);
+    fresh.updateLastRequestTime();
+    fresh.start();
+    // wait up to 10 seconds for client to get data
+    fresh.waitForWindow(10000);
   }
 
   /**
