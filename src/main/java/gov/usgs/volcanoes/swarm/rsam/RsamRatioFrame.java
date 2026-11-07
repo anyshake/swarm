@@ -148,8 +148,13 @@ public class RsamRatioFrame extends JInternalFrame implements Runnable, Settings
         throbber.close();
         pause();
         SwarmInternalFrames.remove(RsamRatioFrame.this);
-        ds1.close();
-        ds2.close();
+        // A shared source locks close(), and a request from any frame can hold that lock.
+        Workers.execute(new Runnable() {
+          public void run() {
+            ds1.close();
+            ds2.close();
+          }
+        });
       }
     });
 

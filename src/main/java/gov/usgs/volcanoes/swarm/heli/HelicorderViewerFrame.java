@@ -18,6 +18,7 @@ import gov.usgs.volcanoes.swarm.SwarmFrame;
 import gov.usgs.volcanoes.swarm.SwarmUtil;
 import gov.usgs.volcanoes.swarm.SwingWorker;
 import gov.usgs.volcanoes.swarm.Throbber;
+import gov.usgs.volcanoes.swarm.Workers;
 import gov.usgs.volcanoes.swarm.chooser.DataChooser;
 import gov.usgs.volcanoes.swarm.data.GulperListener;
 import gov.usgs.volcanoes.swarm.data.SeismicDataSource;
@@ -522,9 +523,15 @@ public class HelicorderViewerFrame extends SwarmFrame implements Kioskable {
         refreshThread.kill();
         SwarmInternalFrames.remove(HelicorderViewerFrame.this);
         WaveViewTime.removeTimeListener(timeListener);
-        dataSource.notifyDataNotNeeded(settings.channel, helicorderViewPanel.getStartTime(),
-            helicorderViewPanel.getEndTime(), gulperListener);
-        dataSource.close();
+        final double startTime = helicorderViewPanel.getStartTime();
+        final double endTime = helicorderViewPanel.getEndTime();
+        // Sources lock these calls, and a refresh can hold that lock through a slow server request.
+        Workers.execute(new Runnable() {
+          public void run() {
+            dataSource.notifyDataNotNeeded(settings.channel, startTime, endTime, gulperListener);
+            dataSource.close();
+          }
+        });
       }
 
       @Override

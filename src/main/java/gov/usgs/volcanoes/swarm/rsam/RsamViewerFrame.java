@@ -179,7 +179,12 @@ public class RsamViewerFrame extends SwarmFrame implements Runnable, SettingsLis
         throbber.close();
         pause();
         SwarmInternalFrames.remove(RsamViewerFrame.this);
-        dataSource.close();
+        // A shared source locks close(), and a request from any frame can hold that lock.
+        Workers.execute(new Runnable() {
+          public void run() {
+            dataSource.close();
+          }
+        });
       }
     });
 
