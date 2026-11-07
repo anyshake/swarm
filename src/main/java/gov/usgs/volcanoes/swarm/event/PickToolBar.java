@@ -11,6 +11,8 @@ import gov.usgs.volcanoes.swarm.Icons;
 import gov.usgs.volcanoes.swarm.Swarm;
 import gov.usgs.volcanoes.swarm.SwarmUtil;
 import gov.usgs.volcanoes.swarm.Throbber;
+import gov.usgs.volcanoes.swarm.Workers;
+import gov.usgs.volcanoes.swarm.data.SeismicDataSource;
 import gov.usgs.volcanoes.swarm.map.MapFrame;
 import gov.usgs.volcanoes.swarm.map.hypocenters.HypocenterLayer;
 import gov.usgs.volcanoes.swarm.wave.WaveClipboardFrame;
@@ -18,6 +20,7 @@ import gov.usgs.volcanoes.swarm.wave.WaveViewPanel;
 import gov.usgs.volcanoes.swarm.wave.WaveViewToolBar;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.util.ArrayList;
 import java.util.List;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -166,11 +169,20 @@ public class PickToolBar extends JToolBar implements PickBoxListener {
             // Add panels to clipbard
             PickBox pickBox = (PickBox) listener;
             List<PickWavePanel> panels = pickBox.getPanels();
+            final List<SeismicDataSource> sources = new ArrayList<SeismicDataSource>();
             for (WaveViewPanel wvp : panels) {
               clipboard.addWave(new WaveViewPanel(wvp));
-              wvp.getDataSource().getChannels(); // get metadata for channels
-              wvp.getDataSource().close();
+              sources.add(wvp.getDataSource());
             }
+            // Each source asks its station service for the channel list, so not on this thread.
+            Workers.execute(new Runnable() {
+              public void run() {
+                for (SeismicDataSource source : sources) {
+                  source.getChannels(); // get metadata for channels
+                  source.close();
+                }
+              }
+            });
 
             // Propagate picks to other channels
             for (WaveViewPanel wvp : clipboard.getWaves()) {
