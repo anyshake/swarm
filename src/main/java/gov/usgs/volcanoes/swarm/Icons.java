@@ -10,13 +10,11 @@ import javax.swing.ImageIcon;
 public class Icons {
   public static final ImageIcon swarm = getIcon("images/swarm.gif");
   public static final ImageIcon camera = getIcon("images/camera.gif");
-  public static final ImageIcon back = getIcon("images/back.gif");
   public static final ImageIcon geoback = getIcon("images/geoback.gif");
   public static final ImageIcon timeback = getIcon("images/timeback.gif");
   public static final ImageIcon clipboard = getIcon("images/clipboard.gif");
   public static final ImageIcon down = getIcon("images/down.gif");
   public static final ImageIcon clock = getIcon("images/date.gif");
-  public static final ImageIcon close = getIcon("images/close.png");
   public static final ImageIcon crosshair = getIcon("images/crosshair.gif");
   public static final ImageIcon close_view = getIcon("images/closeview.gif");
   public static final ImageIcon delete = getIcon("images/delete.gif");
@@ -25,8 +23,6 @@ public class Icons {
   public static final ImageIcon gototime = getIcon("images/gototime.gif");
   public static final ImageIcon heli = getIcon("images/helicorder.gif");
   public static final ImageIcon left = getIcon("images/left.gif");
-  public static final ImageIcon maximize = getIcon("images/maximize.png");
-  public static final ImageIcon minimize = getIcon("images/minimize.png");
   public static final ImageIcon monitor = getIcon("images/monitor.gif");
   public static final ImageIcon open = getIcon("images/wave_folder.gif");
   public static final ImageIcon phi = getIcon("images/phi.png");
@@ -59,7 +55,6 @@ public class Icons {
   public static final ImageIcon edit_server = getIcon("images/edit_server.gif");
   public static final ImageIcon bullet = getIcon("images/bullet.gif");
   public static final ImageIcon honeycomb = getIcon("images/honeycomb.jpg");
-  public static final ImageIcon colorbar = getIcon("images/colorbar.png");
   public static final ImageIcon redbullet = getIcon("images/redbullet.gif");
   public static final ImageIcon helilink = getIcon("images/helicorderlink.gif");
   public static final ImageIcon geosort = getIcon("images/geosort.gif");
@@ -70,7 +65,6 @@ public class Icons {
   public static final ImageIcon ruler = getIcon("images/ruler.gif");
   public static final ImageIcon dragbox = getIcon("images/dragbox.gif");
   public static final ImageIcon drag = getIcon("images/drag.gif");
-  public static final ImageIcon alarm = getIcon("images/alarm.gif");
   public static final ImageIcon resize = getIcon("images/resize.gif");
   public static final ImageIcon label_some = getIcon("images/label_some.gif");
   public static final ImageIcon label_all = getIcon("images/label_all.gif");
@@ -90,7 +84,6 @@ public class Icons {
   public static final ImageIcon rsam_values = getIcon("images/rsam_values.png");
   public static final ImageIcon rsam_counts = getIcon("images/rsam_counts.png");
   public static final ImageIcon particle_motion = getIcon("images/particle_motion.gif");
-  public static final ImageIcon locate = getIcon("images/bee.png");
 
   private static ImageIcon getIcon(String key) {
     return new ImageIcon(ClassLoader.getSystemResource(key));
