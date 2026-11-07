@@ -371,15 +371,4 @@ public class RsamViewerFrame extends SwarmFrame implements Runnable, SettingsLis
     cf.put(prefix + ".source", dataSource.getName());
     settings.save(cf, prefix);
   }
-
-  /**
-   * Set settings.
-   * 
-   * @param settings RSAM view settings
-   */
-  public void setSettings(RsamViewSettings settings) {
-    this.settings = settings;
-    this.settings.addListener(this);
-    this.settingsChanged();
-  }
 }

@@ -1212,28 +1212,6 @@ public class WaveClipboardFrame extends SwarmFrame {
   }
 
   /**
-   * Move selected wave panel down one.
-   */
-  public synchronized void moveDown() {
-    final WaveViewPanel p = getSingleSelected();
-    if (p == null) {
-      return;
-    }
-
-    final int i = waves.indexOf(p);
-    if (i == waves.size() - 1) {
-      return;
-    }
-
-    waves.remove(i);
-    waves.add(i + 1, p);
-    waveBox.remove(p);
-    waveBox.add(p, i + 1);
-    waveBox.validate();
-    repaint();
-  }
-
-  /**
    * Move waves.
    * 
    * @param i index

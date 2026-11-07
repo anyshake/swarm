@@ -29,8 +29,6 @@ import gov.usgs.volcanoes.swarm.Version;
  * @author Kevin Frechette (ISTI)
  */
 public class DataSelectReader extends StringMSeedQueryReader {
-  /** The default web services URL. */
-  public static final String DEFAULT_WS_URL = "http://service.iris.edu/fdsnws/dataselect/1/query";
   private static final Logger LOGGER = LoggerFactory.getLogger(DataSelectReader.class);
   private final SimpleDateFormat queryDateFormat = gmtQueryFormat();
 
@@ -40,22 +38,6 @@ public class DataSelectReader extends StringMSeedQueryReader {
   protected String urlBase;
   /** The user agent. */
   protected String userAgent = "Swarm/" + Version.POM_VERSION;
-
-  /**
-   * Create the data select reader with the default URL and timeout.
-   */
-  public DataSelectReader() {
-    this(DEFAULT_WS_URL);
-  }
-
-  /**
-   * Create the data select reader with the specified URL and the default timeout.
-   * 
-   * @param urlBase the URL base.
-   */
-  public DataSelectReader(String urlBase) {
-    this.urlBase = urlBase;
-  }
 
   /**
    * Create the data select reader with the specified URL and timeout.
@@ -119,33 +101,6 @@ public class DataSelectReader extends StringMSeedQueryReader {
     SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
     format.setTimeZone(TimeZone.getTimeZone("GMT"));
     return format;
-  }
-
-  /**
-   * Get the timeout in milliseconds.
-   * 
-   * @return the timeout in milliseconds.
-   */
-  public int getTimeoutMillis() {
-    return timeoutMillis;
-  }
-
-  /**
-   * Get the URL base.
-   * 
-   * @return the URL base.
-   */
-  public String getUrlBase() {
-    return urlBase;
-  }
-
-  /**
-   * Get the user agent.
-   * 
-   * @return the user agent.
-   */
-  public String getUserAgent() {
-    return userAgent;
   }
 
   /**
@@ -226,23 +181,5 @@ public class DataSelectReader extends StringMSeedQueryReader {
         conn.disconnect();
       }
     }
-  }
-
-  /**
-   * Set the timeout in milliseconds.
-   * 
-   * @param timeoutMillis the timeout in milliseconds.
-   */
-  public void setTimeoutMillis(int timeoutMillis) {
-    this.timeoutMillis = timeoutMillis;
-  }
-
-  /**
-   * Set the user agent.
-   * 
-   * @param userAgent the user agent.
-   */
-  public void setUserAgent(String userAgent) {
-    this.userAgent = userAgent;
   }
 }

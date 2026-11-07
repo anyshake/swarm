@@ -149,10 +149,6 @@ public class HelicorderViewPanel extends JComponent implements SwarmOptionsListe
     listeners.add(HelicorderViewPanelListener.class, listener);
   }
 
-  public void removeListener(HelicorderViewPanelListener listener) {
-    listeners.remove(HelicorderViewPanelListener.class, listener);
-  }
-
   /**
    * Trigger on inset creation.
    * 
@@ -194,14 +190,6 @@ public class HelicorderViewPanel extends JComponent implements SwarmOptionsListe
     }
 
     repaint();
-  }
-
-  public void setStartMark(double t) {
-    startMark = t;
-  }
-
-  public void setEndMark(double t) {
-    endMark = t;
   }
 
   public void clearMarks() {

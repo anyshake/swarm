@@ -57,19 +57,4 @@ public enum HypocenterSource {
   public String getUrl() {
     return url;
   }
-
-  /**
-   * Get hypocenter source from url.
-   * 
-   * @param hypocenterUrl url
-   * @return
-   */
-  public static HypocenterSource fromUrl(String hypocenterUrl) {
-    for (HypocenterSource source : HypocenterSource.values()) {
-      if (source.url.equals(hypocenterUrl)) {
-        return source;
-      }
-    }
-    throw new RuntimeException("Cannot find hypo source for " + hypocenterUrl);
-  }
 }

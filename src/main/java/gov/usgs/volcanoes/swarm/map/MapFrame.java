@@ -239,10 +239,6 @@ public class MapFrame extends SwarmFrame implements Runnable, Kioskable, SwarmOp
     super.setMaximum(max);
   }
 
-  public GeoRange getRange() {
-    return mapPanel.getRange();
-  }
-
   private void createToolbar() {
     toolbar = SwarmUtil.createToolBar();
     optionsButton =
@@ -592,10 +588,6 @@ public class MapFrame extends SwarmFrame implements Runnable, Kioskable, SwarmOp
 
   public void reset(final boolean doMap) {
     mapPanel.resetImage(doMap);
-  }
-
-  public void mapSettingsChanged() {
-    mapPanel.loadMaps(true);
   }
 
   public HelicorderViewPanelListener getLinkListener() {

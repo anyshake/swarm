@@ -54,8 +54,6 @@ public class WebServicesSource extends SeismicDataSource implements WebServiceCo
   private int gulpDelay;
   /** The gulp size. */
   private int gulpSize;
-  /** The colon separated parameters. */
-  private String params;
 
   /**
    * Default constructor.
@@ -70,17 +68,6 @@ public class WebServicesSource extends SeismicDataSource implements WebServiceCo
    */
   public WebServicesSource(String channel) {
     setChannel(channel);
-  }
-
-  /**
-   * Create a Web Services server source with the same parameters as the specified
-   * Web Services server source.
-   * 
-   * @param sls the Web Services server source.
-   */
-  public WebServicesSource(WebServicesSource sls) {
-    name = sls.name;
-    parse(sls.params);
   }
 
   @Override
@@ -103,15 +90,6 @@ public class WebServicesSource extends SeismicDataSource implements WebServiceCo
   public synchronized List<String> getChannels() {
     List<String> channels = client.getChannels();
     return Collections.unmodifiableList(channels);
-  }
-
-  /**
-   * Get a copy of this data source.
-   * 
-   * @return a copy of this data source.
-   */
-  public SeismicDataSource getCopy() {
-    return new WebServicesSource(this);
   }
 
   /**
@@ -206,7 +184,6 @@ public class WebServicesSource extends SeismicDataSource implements WebServiceCo
    * @see gov.usgs.volcanoes.swarm.data.SeismicDataSource#parse(java.lang.String)
    */
   public void parse(String params) {
-    this.params = params;
     String[] ss = params.split(PARAM_SPLIT_TEXT);
     int ssIndex = 0;
     String net = ss[ssIndex++];

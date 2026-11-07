@@ -985,33 +985,6 @@ public class EventDialog extends SwarmFrame {
   }
 
   /**
-   * Validate input values.
-   * 
-   * @see gov.usgs.volcanoes.swarm.SwarmModalDialog#allowOk()
-   */
-  protected boolean allowOk() {
-    return true;
-  }
-
-  /**
-   * Create event and save to QuakeML file.
-   * 
-   * @see gov.usgs.volcanoes.swarm.SwarmModalDialog#wasOk()
-   */
-  protected void wasOk() {
-
-  }
-
-  /**
-   * Revert settings.
-   * 
-   * @see gov.usgs.volcanoes.swarm.SwarmModalDialog#wasCancelled()
-   */
-  protected void wasCancelled() {
-
-  }
-
-  /**
    * Set event details from existing event.
    * 
    * @param event existing event

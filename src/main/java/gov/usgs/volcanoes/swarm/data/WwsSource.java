@@ -4,7 +4,6 @@ import gov.usgs.volcanoes.core.data.HelicorderData;
 import gov.usgs.volcanoes.core.data.RSAMData;
 import gov.usgs.volcanoes.core.data.Scnl;
 import gov.usgs.volcanoes.core.data.Wave;
-import gov.usgs.volcanoes.core.legacy.ew.MenuItem;
 import gov.usgs.volcanoes.core.time.J2kSec;
 import gov.usgs.volcanoes.core.time.TimeSpan;
 import gov.usgs.volcanoes.core.util.UtilException;
@@ -13,7 +12,6 @@ import gov.usgs.volcanoes.swarm.SwarmConfig;
 import gov.usgs.volcanoes.winston.Channel;
 import gov.usgs.volcanoes.wwsclient.WWSClient;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 
 /**
@@ -72,31 +70,6 @@ public class WwsSource extends SeismicDataSource implements RsamSource {
     if (winstonClient != null) {
       winstonClient.close();
     }
-  }
-
-  /**
-   * Get formatted SCNL.
-   * 
-   * @param mi menu item
-   * @return SCNL string space delimited
-   */
-  public String getFormattedScnl(MenuItem mi) {
-    return mi.getSCNSCNL(" ");
-  }
-
-  /**
-   * Get menu list.
-   * 
-   * @param items list of menu items
-   * @return list of SCNL string
-   */
-  public List<String> getMenuList(List<MenuItem> items) {
-    List<String> list = new ArrayList<String>(items.size());
-    for (Iterator<MenuItem> it = items.iterator(); it.hasNext();) {
-      MenuItem mi = it.next();
-      list.add(getFormattedScnl(mi));
-    }
-    return list;
   }
 
   /**

@@ -9,7 +9,6 @@ import gov.usgs.volcanoes.core.CodeTimer;
 import gov.usgs.volcanoes.core.contrib.PngEncoder;
 import gov.usgs.volcanoes.core.contrib.PngEncoderB;
 import gov.usgs.volcanoes.core.data.Wave;
-import gov.usgs.volcanoes.core.time.J2kSec;
 import gov.usgs.volcanoes.core.util.UiUtils;
 import gov.usgs.volcanoes.quakeml.Arrival;
 import gov.usgs.volcanoes.quakeml.Pick;
@@ -577,57 +576,6 @@ public class PickBox extends JPanel implements Scrollable, PickToolBarListener {
     }
   }
 
-
-  /**
-   * Go to input time.
-   * 
-   * @param wvp wave panel
-   * @param t time specified time
-   */
-  public void gotoTime(final WaveViewPanel wvp, String t) {
-    double j2k = Double.NaN;
-    try {
-      if (t.length() == 12) {
-        t = t + "30";
-      }
-
-      j2k = J2kSec.parse("yyyyMMddHHmmss", t);
-    } catch (final Exception e) {
-      JOptionPane.showMessageDialog(APPLICATION_FRAME, "Illegal time value.", "Error",
-          JOptionPane.ERROR_MESSAGE);
-    }
-
-    if (!Double.isNaN(j2k)) {
-      double dt = 60;
-      if (wvp.getWave() != null) {
-        final double st = wvp.getStartTime();
-        final double et = wvp.getEndTime();
-        final double[] ts = new double[] { st, et };
-        addHistory(wvp, ts);
-        dt = (et - st);
-      }
-
-      final double tzo =
-          SWARM_CONFIG.getTimeZone(wvp.getChannel()).getOffset(System.currentTimeMillis()) / 1000;
-
-      final double nst = j2k - tzo - dt / 2;
-      final double net = nst + dt;
-
-      fetchNewWave(wvp, nst, net);
-    }
-    wvp.createImage();
-  }
-
-  /**
-   * Go to selected time in all wave panels.
-   * 
-   * @param t specified time
-   */
-  public void gotoTime(final String t) {
-    for (final WaveViewPanel p : selectedSet) {
-      gotoTime(p, t);
-    }
-  }
 
   /**
    * Sort channels by nearest.

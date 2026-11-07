@@ -146,13 +146,4 @@ public class ChannelInfo extends AbstractChannelInfo implements Comparable<Chann
   public String getStation() {
     return stationInfo.getStation();
   }
-
-  /**
-   * Get the station information.
-   * 
-   * @return the station information.
-   */
-  public StationInfo getStationInfo() {
-    return stationInfo;
-  }
 }

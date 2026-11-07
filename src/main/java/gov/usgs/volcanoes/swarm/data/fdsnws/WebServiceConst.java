@@ -9,8 +9,6 @@ public interface WebServiceConst {
   String DEFAULT_DATASELECT_URL = "http://localhost/fdsnws/dataselect/1/query";
   /** The default station URL */
   String DEFAULT_STATION_URL = "http://localhost/fdsnws/station/1/query";
-  /** Default web services station client URL */
-  String DEFAULT_WS_URL = "https://service.iris.edu/fdsnws/station/1/query";
   /** Web services source description. */
   String DESCRIPTION = "an FDSN Web Services server";
   /** Empty location code. */

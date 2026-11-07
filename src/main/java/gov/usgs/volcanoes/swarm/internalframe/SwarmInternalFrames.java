@@ -102,10 +102,6 @@ public final class SwarmInternalFrames {
     internalFrameListeners.add(InternalFrameListener.class, tl);
   }
 
-  public static void removeInternalFrameListener(InternalFrameListener tl) {
-    internalFrameListeners.remove(InternalFrameListener.class, tl);
-  }
-
   public static int frameCount() {
     return internalFrames.size();
   }

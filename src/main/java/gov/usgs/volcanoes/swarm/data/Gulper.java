@@ -64,10 +64,6 @@ public class Gulper implements Runnable {
     listeners.remove(gl);
   }
 
-  public String getChannel() {
-    return channel;
-  }
-
   public String getKey() {
     return key;
   }

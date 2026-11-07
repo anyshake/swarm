@@ -389,16 +389,6 @@ public class WaveViewSettings {
     notifyView();
   }
 
-  public void toggleSpectraLogFreq() {
-    spectraLogFreq = !spectraLogFreq;
-    notifyView();
-  }
-
-  public void toggleSpectraLogPower() {
-    spectraLogPower = !spectraLogPower;
-    notifyView();
-  }
-
   public void toggleSpectrogramLogPower() {
     spectrogramLogPower = !spectrogramLogPower;
     notifyView();

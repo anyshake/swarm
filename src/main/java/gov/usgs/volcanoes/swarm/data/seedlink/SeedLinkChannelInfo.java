@@ -229,15 +229,6 @@ public class SeedLinkChannelInfo extends AbstractChannelInfo {
     return station;
   }
 
-  /**
-   * Get the type.
-   * 
-   * @return the type.
-   */
-  public String getType() {
-    return type;
-  }
-
   @Override
   public double getHeight() {
     return elevation;

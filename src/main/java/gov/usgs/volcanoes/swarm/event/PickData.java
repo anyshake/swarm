@@ -225,16 +225,6 @@ public class PickData {
   }
 
   /**
-   * Set pick channel flag.
-   * 
-   * @param phase P or S
-   * @param pickChannel true if this is the channel pick was made on
-   */
-  public void setPickChannel(String phase, boolean pickChannel) {
-    pickChannels.put(phase, pickChannel);
-  }
-
-  /**
    * Create pick object.
    * 
    * @param phase P or S
@@ -340,34 +330,6 @@ public class PickData {
     return picks;
   }
 
-
-  /**
-   * Set picks.
-   * 
-   * @param picks the picks to set
-   */
-  public void setPicks(HashMap<String, Pick> picks) {
-    this.picks = picks;
-  }
-
-  /**
-   * Get pick channels.
-   * 
-   * @return the pickChannels
-   */
-  public HashMap<String, Boolean> getPickChannels() {
-    return pickChannels;
-  }
-
-
-  /**
-   * Set pick channels.
-   * 
-   * @param pickChannels the pickChannels to set
-   */
-  public void setPickChannels(HashMap<String, Boolean> pickChannels) {
-    this.pickChannels = pickChannels;
-  }
 
   /**
    * Set weight for a pick.

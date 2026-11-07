@@ -80,14 +80,6 @@ public class RsamRatioPanel extends JComponent implements SettingsListener {
   private double countedMaxLength = Double.NaN;
 
   /**
-   * Constructs a WaveViewPanel with default settings.
-   */
-  public RsamRatioPanel() {
-    this(new RsamViewSettings());
-    settings.addListener(this);
-  }
-
-  /**
    * Constructs a WaveViewPanel with specified settings.
    * 
    * @param s the settings
@@ -124,10 +116,6 @@ public class RsamRatioPanel extends JComponent implements SettingsListener {
     working = b;
   }
 
-
-  public String getChannel() {
-    return channel;
-  }
 
   public void setChannel(String c) {
     channel = c;

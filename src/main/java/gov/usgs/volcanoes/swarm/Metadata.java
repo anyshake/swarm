@@ -383,21 +383,6 @@ public class Metadata implements Comparable<Metadata> {
 
 
   /**
-   * Get distance to another point.
-   * 
-   * @param pt the point
-   * @return distance in meters
-   */
-  public double distanceTo(Point2D.Double pt) {
-    if (pt == null || Double.isNaN(latitude) || Double.isNaN(longitude) || Double.isNaN(pt.x)
-        || Double.isNaN(pt.y)) {
-      return Double.NaN;
-    }
-
-    return Projection.distanceBetweenM(new Point2D.Double(longitude, latitude), pt);
-  }
-
-  /**
    * Get distance to another station.
    * 
    * @param other metadata of other station

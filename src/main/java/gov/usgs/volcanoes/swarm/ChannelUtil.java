@@ -4,7 +4,6 @@ import gov.usgs.volcanoes.swarm.data.SeismicDataSource;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -51,19 +50,6 @@ public final class ChannelUtil {
       knownChannels.add(formattedScnl);
     }
     return formattedScnl;
-  }
-
-  /**
-   * Add the channel, scanning the list when the caller does not keep a membership set.
-   *
-   * @param channels the list of channels.
-   * @param ch the channel information.
-   * @param source the seismic data source.
-   * @return the channel information text.
-   */
-  public static String addChannel(List<String> channels, AbstractChannelInfo ch,
-      SeismicDataSource source) {
-    return addChannel(channels, new HashSet<String>(channels), ch, source);
   }
 
   /**

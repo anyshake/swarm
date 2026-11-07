@@ -127,8 +127,6 @@ public class HelicorderViewerFrame extends SwarmFrame implements Kioskable {
   private JFileChooser chooser;
   private JButton scaleButton;
   private boolean scaleClipState;
-  protected JToggleButton autoScaleSliderButton;
-  protected int autoScaleSliderButtonState;
   protected JSlider autoScaleSlider;
 
   private HelicorderViewPanel helicorderViewPanel;
@@ -615,10 +613,6 @@ public class HelicorderViewerFrame extends SwarmFrame implements Kioskable {
       }
     };
     dataSource.addListener(dataListener);
-  }
-
-  public HelicorderViewPanel getHelicorderViewPanel() {
-    return helicorderViewPanel;
   }
 
   /**

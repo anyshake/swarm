@@ -214,49 +214,12 @@ public class PickMenu extends JPopupMenu {
   }
 
   /**
-   * Clear coda picks.
-   */
-  public void clearCoda() {
-    pickData.picks.remove(PickData.CODA1);
-    pickData.picks.remove(PickData.CODA2);
-    wvp.repaint();
-  }
-
-
-  /**
-   * Get currently set time as J2K.
-   * 
-   * @return j2k time
-   */
-  public double getJ2k() {
-    return j2k;
-  }
-
-  /**
    * Set currently selected time as J2K.
    * 
    * @param j2k time
    */
   public void setJ2k(double j2k) {
     this.j2k = j2k;
-  }
-
-  /**
-   * Get enabled/disabled option for hiding phases.
-   * 
-   * @return true if hide phases option is enabled
-   */
-  public boolean isHidePhases() {
-    return hidePhasesMenu.isSelected();
-  }
-
-  /**
-   * Get enabled/disabled option for hiding coda.
-   * 
-   * @return true if hide coda option is enabled
-   */
-  public boolean isHideCoda() {
-    return hideCodaMenu.isSelected();
   }
 
 

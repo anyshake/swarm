@@ -125,32 +125,6 @@ public class HelicorderViewerSettings {
   }
 
   /**
-   * Parse setting string.
-   * 
-   * @param o setting string
-   */
-  public void parseSettingsString(String o) {
-    // String[] opts = Util.splitString(o, ",");
-    String[] opts = o.split(",");
-    for (int i = 0; i < opts.length; i++) {
-      try {
-        String key = opts[i].substring(0, opts[i].indexOf('='));
-        String value = opts[i].substring(opts[i].indexOf('=') + 1);
-
-        if (key.equals("x")) {
-          // minutes
-          timeChunk = Integer.parseInt(value) * 60;
-        } else if (key.equals("y")) {
-          // hours
-          span = Integer.parseInt(value) * 60;
-        }
-      } catch (Exception e) {
-        System.err.println("Could not parse setting: " + opts[i]);
-      }
-    }
-  }
-
-  /**
    * Notify view.
    */
   public void notifyView() {

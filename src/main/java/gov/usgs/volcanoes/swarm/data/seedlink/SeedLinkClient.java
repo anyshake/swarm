@@ -257,15 +257,6 @@ public class SeedLinkClient implements Runnable, SwarmConst, TimeConstants {
     return sb.substring(start, end);
   }
 
-  /**
-   * Get the end time.
-   * 
-   * @return the end time or <code>NaN</code> if none.
-   */
-  public double getEndTime() {
-    return endTime;
-  }
-
   /*
    * taken from Robert Casey's PDCC seed code.
    * rate = |factor|^sign(factor) * |multiplier|^sign(multiplier), which is the value itself
@@ -285,15 +276,6 @@ public class SeedLinkClient implements Runnable, SwarmConst, TimeConstants {
           * Math.pow(Math.abs(multiplier), (multiplier / Math.abs(multiplier))));
     }
     return sampleRate;
-  }
-
-  /**
-   * Get the start time.
-   * 
-   * @return the start time or <code>NaN</code> if none.
-   */
-  public double getStartTime() {
-    return startTime;
   }
 
   private static final ThreadLocal<Calendar> GMT_CALENDAR = new ThreadLocal<Calendar>() {
@@ -604,29 +586,6 @@ public class SeedLinkClient implements Runnable, SwarmConst, TimeConstants {
       }
     }
     return isData();
-  }
-
-  /**
-   * Wait for done if the client is running.
-   * 
-   * @param timeout the maximum time to wait in milliseconds.
-   * @return true if the run was started and is done.
-   */
-  public boolean waitForDone(long timeout) {
-    if (isDone()) {
-      return true;
-    }
-    if (isRunning()) {
-      try {
-        synchronized (doneSync) {
-          if (!doneFlag) {
-            doneSync.wait(timeout);
-          }
-        }
-      } catch (Exception ex) {
-      }
-    }
-    return isDone();
   }
 
   /**

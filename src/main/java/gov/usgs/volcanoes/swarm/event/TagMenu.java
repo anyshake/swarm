@@ -250,15 +250,6 @@ public class TagMenu extends JPopupMenu {
   }
 
   /**
-   * Get currently set time as J2K.
-   * 
-   * @return j2k time
-   */
-  public double getJ2k() {
-    return j2k;
-  }
-
-  /**
    * Set currently selected time as J2K.
    * 
    * @param j2k time
