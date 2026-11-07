@@ -936,12 +936,16 @@ public class HelicorderViewerFrame extends SwarmFrame implements Kioskable {
         // TODO: extract magic number
         if (reset || !Double.isNaN(settings.getBottomTime())
             && settings.getLastBottomTimeSet() > 10 * 60 * 1000) {
-          helicorderViewPanel.removeWaveInset();
-          helicorderViewPanel.clearMarks();
           settings.setBottomTime(Double.NaN);
-          if (swarmConfig.isKiosk() && !Swarm.isFullScreenMode()) {
-            ((Swarm) Swarm.getApplicationFrame()).toggleFullScreenMode();
-          }
+          SwingUtilities.invokeLater(new Runnable() {
+            public void run() {
+              helicorderViewPanel.removeWaveInset();
+              helicorderViewPanel.clearMarks();
+              if (swarmConfig.isKiosk() && !Swarm.isFullScreenMode()) {
+                ((Swarm) Swarm.getApplicationFrame()).toggleFullScreenMode();
+              }
+            }
+          });
         }
 
         try {
