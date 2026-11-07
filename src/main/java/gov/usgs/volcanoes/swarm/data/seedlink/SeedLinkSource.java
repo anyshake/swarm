@@ -196,7 +196,9 @@ public class SeedLinkSource extends SeismicDataSource {
    * @param gl the gulper listener.
    * @return the helicorder data or null if none.
    */
-  public synchronized HelicorderData getHelicorder(String scnl, double t1, double t2,
+  // Not synchronized, like getWave: each channel's backfill waits on the server, and a lock here
+  // made every other helicorder wait behind it.
+  public HelicorderData getHelicorder(String scnl, double t1, double t2,
       GulperListener gl) {
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("SeedLinkSource getHelicorder: {} {} {}", scnl, J2kSec.toDateString(t1),
@@ -380,8 +382,6 @@ public class SeedLinkSource extends SeismicDataSource {
    */
   public void notifyDataNotNeeded(String station, double t1, double t2,
       GulperListener gl) {
-    // Not synchronized: a helicorder fetch holds the source lock while it waits on the server, and
-    // this runs on the EDT when a viewer closes.
     if (!CLOSE_WHEN_DATA_NOT_NEEDED) {
       return;
     }
