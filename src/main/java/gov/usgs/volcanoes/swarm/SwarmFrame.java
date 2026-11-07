@@ -6,12 +6,16 @@ import java.awt.Component;
 import java.awt.Container;
 import java.awt.Dimension;
 import java.awt.Graphics;
+import java.awt.Insets;
 import java.awt.Point;
 import java.awt.Rectangle;
 import javax.swing.JComponent;
 import javax.swing.JFrame;
 import javax.swing.JInternalFrame;
 import javax.swing.SwingUtilities;
+import javax.swing.UIManager;
+import javax.swing.border.Border;
+import javax.swing.border.CompoundBorder;
 import javax.swing.plaf.basic.BasicInternalFrameUI;
 
 /**
@@ -55,9 +59,45 @@ public class SwarmFrame extends JInternalFrame {
   @Override
   protected void paintBorder(Graphics g) {
     Rectangle clip = g.getClipBounds();
-    if (clip == null || !coveredByContent(clip)) {
+    if (clip != null && coveredByContent(clip)) {
+      return;
+    }
+    if (!paintAquaTitleBorder(g)) {
       super.paintBorder(g);
     }
+  }
+
+  /**
+   * Paints the Aqua border with its title bar part cut off 8 rows inside the opaque content pane,
+   * which covers everything below. Aqua renders that part as one native image as tall as it is
+   * given, and its image cache holds only a frame or two of full size at Retina scale, so each
+   * repaint across overlapping frames rendered whole frames again. Aqua draws every row more than
+   * two above the cut the same at any height, so the visible pixels do not change.
+   */
+  private boolean paintAquaTitleBorder(Graphics g) {
+    if (!(getBorder() instanceof CompoundBorder)
+        || !"Aqua".equals(UIManager.getLookAndFeel().getID())) {
+      return false;
+    }
+    CompoundBorder border = (CompoundBorder) getBorder();
+    Border outside = border.getOutsideBorder();
+    Border inside = border.getInsideBorder();
+    Container content = getContentPane();
+    if (outside == null || inside == null || content == null || !content.isOpaque()
+        || !content.isVisible()) {
+      return false;
+    }
+    Insets o = outside.getBorderInsets(this);
+    Rectangle in =
+        new Rectangle(o.left, o.top, getWidth() - o.left - o.right, getHeight() - o.top - o.bottom);
+    Rectangle c = SwingUtilities.convertRectangle(content.getParent(), content.getBounds(), this);
+    int h = c.y - in.y + 8;
+    if (h >= in.height || !c.contains(in.x, c.y, in.width, in.y + in.height - c.y)) {
+      return false;
+    }
+    outside.paintBorder(this, g, 0, 0, getWidth(), getHeight());
+    inside.paintBorder(this, g, in.x, in.y, in.width, h);
+    return true;
   }
 
   private boolean coveredByContent(Rectangle clip) {
