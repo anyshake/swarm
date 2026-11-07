@@ -213,10 +213,13 @@ public class SeedLinkClient implements Runnable, SwarmConst, TimeConstants {
     if (scnl == null || wave == null) {
       return;
     }
+    final double end = wave.getEndTime();
     CachedDataSource cache = CachedDataSource.getInstance();
-    cache.putWave(scnl, wave);
+    // Rows first: putWave keeps this wave, and another client's packet for the channel can grow
+    // it in place before the rows are made from it.
     cache.cacheWaveAsHelicorder(scnl, wave);
-    notifyData(wave.getEndTime());
+    cache.putWave(scnl, wave);
+    notifyData(end);
   }
 
   /**
