@@ -131,8 +131,7 @@ public class Hypo71SettingsDialog extends SwarmModalDialog {
     // verify test variable values
     for (int i = 0; i < Hypo71Settings.testDefault.length; i++) {
       try {
-        @SuppressWarnings("unused")
-        double value = Double.valueOf(test[i].getText());
+        Double.valueOf(test[i].getText());
       } catch (NumberFormatException e) {
         ok = false;
       }
@@ -216,8 +215,7 @@ public class Hypo71SettingsDialog extends SwarmModalDialog {
     public boolean verify(JComponent input) {
       String text = ((JTextField) input).getText();
       try {
-        @SuppressWarnings("unused")
-        double value = Double.valueOf(text);
+        Double.valueOf(text);
         return true;
       } catch (NumberFormatException e) {
         return false;

@@ -278,26 +278,20 @@ public class RsamViewSettingsDialog extends SwarmModalDialog {
     String message = null;
     try {
       message = "Error in despike period.";
-      @SuppressWarnings("unused")
-      int dp = Integer.valueOf(despikePeriod.getText());
+      Integer.valueOf(despikePeriod.getText());
 
       message = "Error in event threshold.";
-      @SuppressWarnings("unused")
-      int et = Integer.parseInt(eventThreshold.getText());
+      Integer.parseInt(eventThreshold.getText());
       message = "Error in event ratio.";
-      @SuppressWarnings("unused")
-      double er = Double.parseDouble(eventRatio.getText());
+      Double.parseDouble(eventRatio.getText());
       message = "Error in event max length.";
-      @SuppressWarnings("unused")
-      double eml = Double.parseDouble(eventMaxLength.getText());
+      Double.parseDouble(eventMaxLength.getText());
 
       if (!autoScale.isSelected()) {
         message = "Error in Scale min";
-        @SuppressWarnings("unused")
-        int sm = Integer.parseInt(scaleMin.getText());
+        Integer.parseInt(scaleMin.getText());
         message = "Error in Scale max";
-        @SuppressWarnings("unused")
-        int sn = Integer.parseInt(scaleMax.getText());
+        Integer.parseInt(scaleMax.getText());
       }
 
       message = "Error in running median period.";
