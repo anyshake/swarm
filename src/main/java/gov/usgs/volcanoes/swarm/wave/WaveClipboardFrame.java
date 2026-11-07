@@ -1524,16 +1524,19 @@ public class WaveClipboardFrame extends SwarmFrame {
    * Import event into clipboard. Event must be set first.
    */
   public void importEvent(final Event event, final boolean removeWaves) {
+    if (removeWaves) {
+      removeWaves();
+    }
+    // update event dialog
+    EventDialog.getInstance().setEventDetails(event);
+
+    // The worker downloads; the event thread adds the panels and propagates picks when it is done.
     final SwingWorker worker = new SwingWorker() {
+      private final HashMap<String, WaveViewPanel> panels = new HashMap<String, WaveViewPanel>();
+
       @Override
       public Object construct() {
         throbber.increment();
-
-        if (removeWaves) {
-          removeWaves();
-        }
-        // update event dialog
-        EventDialog.getInstance().setEventDetails(event);
 
         // get wave start and end times
         long firstPick = Long.MAX_VALUE;
@@ -1547,7 +1550,6 @@ public class WaveClipboardFrame extends SwarmFrame {
         double waveEnd = J2kSec.fromEpoch(lastPick) + 2;
 
         // create wave view panels
-        HashMap<String, WaveViewPanel> panels = new HashMap<String, WaveViewPanel>();
         SeismicDataSource sourceToUse = null;
         for (Pick pick : event.getPicks().values()) {
           String channel = pick.getChannel().replaceAll("\\$", " ").trim();
@@ -1617,11 +1619,18 @@ public class WaveClipboardFrame extends SwarmFrame {
         }
 
 
+        for (WaveViewPanel wvp : panels.values()) {
+          wvp.getDataSource().getChannels(); // get channel metadata
+          wvp.getDataSource().close();
+        }
+        return null;
+      }
+
+      @Override
+      public void finished() {
         // add wave view panels to clipboard
         for (WaveViewPanel wvp : panels.values()) {
           addWave(wvp);
-          wvp.getDataSource().getChannels(); // get channel metadata
-          wvp.getDataSource().close();
         }
 
         // Propagate picks. Get picks for the same
@@ -1636,11 +1645,6 @@ public class WaveClipboardFrame extends SwarmFrame {
             }
           }
         }
-        return null;
-      }
-
-      @Override
-      public void finished() {
         throbber.decrement();
         repaint();
         EventDialog.getInstance().checkForPicks();
