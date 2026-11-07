@@ -193,9 +193,9 @@ public class SeedLinkConnection {
      */
     protected boolean dialup = false;
     /**
-     * Flag to control connection termination.
+     * Flag to control connection termination. Set from other threads.
      */
-    protected boolean terminateFlag = false;
+    protected volatile boolean terminateFlag = false;
     /**
      * ID of the remote SeedLink server.
      */
@@ -1079,6 +1079,7 @@ public class SeedLinkConnection {
     protected SLPacket doTerminate() {
 
         sllog.log(false, 0, "[" + sladdr + "] terminating collect loop");
+        terminateFlag = false;
         disconnect();
         //state.state = SLState.SL_DOWN;  // AJL added
         // state.state = SLState.SL_DATA; // libslink error?
@@ -1103,7 +1104,8 @@ public class SeedLinkConnection {
      */
     public SLPacket collect() throws SeedLinkException {
 
-        terminateFlag = false;
+        // terminateFlag is cleared once acted on, not here: a terminate() made while the caller
+        // handled the previous packet would be lost.
 
         // Check if the infoRequestString was set
         if (infoRequestString != null) {
