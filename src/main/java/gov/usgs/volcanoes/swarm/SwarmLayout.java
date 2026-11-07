@@ -18,10 +18,12 @@ import gov.usgs.volcanoes.swarm.wave.WaveViewSettings;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.File;
+import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.List;
 import javax.swing.JFrame;
 import javax.swing.JOptionPane;
+import javax.swing.SwingUtilities;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -111,12 +113,20 @@ public class SwarmLayout implements Comparable<SwarmLayout> {
       public Object construct() {
         SwarmInternalFrames.removeAllFrames();
         processChooser();
-        processMap();
-        processWaves();
-        processHelicorders();
-        processMonitors();
+        onEventThread(new Runnable() {
+          public void run() {
+            processMap();
+            processWaves();
+            processHelicorders();
+            processMonitors();
+          }
+        });
         processClipboard();
-        processRsam();
+        onEventThread(new Runnable() {
+          public void run() {
+            processRsam();
+          }
+        });
         return null;
       }
 
@@ -126,6 +136,20 @@ public class SwarmLayout implements Comparable<SwarmLayout> {
       }
     };
     worker.start();
+  }
+
+  /**
+   * Run a step that builds or shows frames on the event thread and wait for it, so the steps keep
+   * their order while the chooser wait and clipboard downloads stay on the layout worker.
+   */
+  private static void onEventThread(final Runnable r) {
+    try {
+      SwingUtilities.invokeAndWait(r);
+    } catch (final InterruptedException e) {
+      Thread.currentThread().interrupt();
+    } catch (final InvocationTargetException e) {
+      throw new RuntimeException(e.getCause());
+    }
   }
 
   private class ChooserListener implements ActionListener {
@@ -255,19 +279,27 @@ public class SwarmLayout implements Comparable<SwarmLayout> {
   }
 
   private void processClipboard() {
-    WaveClipboardFrame wcf = WaveClipboardFrame.getInstance();
+    final WaveClipboardFrame wcf = WaveClipboardFrame.getInstance();
     final ConfigFile cf = config.getSubConfig("clipboard");
     if (cf.getConfig().size() == 0) {
-      wcf.hide();
+      onEventThread(new Runnable() {
+        public void run() {
+          wcf.hide();
+        }
+      });
       return;
     }
-    wcf.removeWaves();
+    onEventThread(new Runnable() {
+      public void run() {
+        wcf.removeWaves();
+      }
+    });
     final int waves = cf.getInt("waves");
     for (int i = 0; i < waves; i++) {
       final ConfigFile scf = cf.getSubConfig("wave-" + i);
       WaveViewSettings wvs = new WaveViewSettings();
       wvs.set(scf);
-      WaveViewPanel wvp = new WaveViewPanel(wvs);
+      final WaveViewPanel wvp = new WaveViewPanel(wvs);
       SeismicDataSource ds = SwarmConfig.getInstance().getSource(scf.getString("source"));
       wvp.setDataSource(ds);
       String channel = scf.getString("channel");
@@ -276,9 +308,17 @@ public class SwarmLayout implements Comparable<SwarmLayout> {
       double et = scf.getDouble("endTime");
       Wave wave = ds.getWave(channel, st, et);
       wvp.setWave(wave, st, et);
-      wcf.addWave(wvp);
+      onEventThread(new Runnable() {
+        public void run() {
+          wcf.addWave(wvp);
+        }
+      });
     }
-    wcf.show();
+    onEventThread(new Runnable() {
+      public void run() {
+        wcf.show();
+      }
+    });
   }
 
   private void processRsam() {
