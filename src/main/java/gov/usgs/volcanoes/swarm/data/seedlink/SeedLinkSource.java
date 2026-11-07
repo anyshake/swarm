@@ -69,6 +69,12 @@ public class SeedLinkSource extends SeismicDataSource {
   /** The earliest start asked of the server for each channel, and when, as {start, millis}. */
   private final ConcurrentHashMap<String, double[]> backfills = new ConcurrentHashMap<>();
 
+  /** How long a past-data request is waited for. */
+  private static final long WINDOW_WAIT_MS = 10000;
+
+  /** The longest window AnyShake Observer serves; it refuses longer ones. */
+  private static final double PIECE_SECONDS = 3600;
+
   /**
    * Parse config string.
    * 
@@ -289,7 +295,7 @@ public class SeedLinkSource extends SeismicDataSource {
   }
 
   /**
-   * Start new client to get past data if there isn't already one running.
+   * Get past data, waiting for it like a single request would.
    * 
    * @param scnl channel
    * @param t1 start time
@@ -305,9 +311,38 @@ public class SeedLinkSource extends SeismicDataSource {
     }
     backfills.put(scnl, new double[] {t1, now});
 
+    final SeedLinkClient whole = startPastClient(scnl, t1, t2);
+    whole.waitForWindow(WINDOW_WAIT_MS);
+    if (!whole.isRefused()) {
+      return;
+    }
+    // AnyShake Observer refuses windows over an hour. Ask an hour at a time, newest first, until a
+    // piece is refused, brings nothing (no older history) or is still arriving. Pieces left after
+    // the usual wait are asked on the next refresh, which starts at the oldest cached sample.
+    for (double end = t2; end > t1; end -= PIECE_SECONDS) {
+      if (System.currentTimeMillis() - now > WINDOW_WAIT_MS) {
+        backfills.put(scnl, new double[] {end, now});
+        return;
+      }
+      final SeedLinkClient piece = startPastClient(scnl, Math.max(t1, end - PIECE_SECONDS), end);
+      if (!piece.waitForWindow(WINDOW_WAIT_MS) || piece.isRefused() || !piece.isData()) {
+        return;
+      }
+    }
+  }
+
+  /**
+   * Start a client for past data, replacing the one running for the channel.
+   * 
+   * @param scnl channel
+   * @param t1 start time
+   * @param t2 end time
+   * @return the started client
+   */
+  private SeedLinkClient startPastClient(String scnl, double t1, double t2) {
     SeedLinkClient client = clients.get(scnl);
     if (client != null) {
-      // the new request starts no later, so it covers what this one was fetching
+      // the new request starts no later, or the one before it has arrived
       client.closeConnection();
     }
     final SeedLinkClient fresh = new SeedLinkClient(host, port, t1, t2, scnl);
@@ -324,8 +359,7 @@ public class SeedLinkSource extends SeismicDataSource {
     clients.put(scnl, fresh);
     fresh.updateLastRequestTime();
     fresh.start();
-    // wait up to 10 seconds for client to get data
-    fresh.waitForWindow(10000);
+    return fresh;
   }
 
   /**
