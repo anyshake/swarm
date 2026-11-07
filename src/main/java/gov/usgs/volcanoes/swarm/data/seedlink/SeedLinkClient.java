@@ -62,6 +62,9 @@ public class SeedLinkClient implements Runnable, SwarmConst, TimeConstants {
    */
   private static final int NET_TIMEOUT_SECONDS = 60;
 
+  /** Seconds before a lost link is reopened, and between tries while the server is down. */
+  private static final int RECONNECT_DELAY_SECONDS = 10;
+
   private final Object dataSync = new Object();
   private final Object doneSync = new Object();
   private boolean dataFlag;
@@ -159,6 +162,8 @@ public class SeedLinkClient implements Runnable, SwarmConst, TimeConstants {
     // server answers even when its streams are quiet, so only a dead link stays silent.
     slconn.setKeepAlive(KEEPALIVE_SECONDS);
     slconn.setNetTimout(NET_TIMEOUT_SECONDS);
+    // The library's 30 s suits an unattended collector; a viewer shows nothing new until then.
+    slconn.setNetDelay(RECONNECT_DELAY_SECONDS);
     slconn.setSLAddress(sladdr);
 
     // Make sure a server was specified
