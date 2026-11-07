@@ -265,7 +265,24 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
       enforceSize();
     } else {
       boolean add = true;
-      for (int i = 0; i < helis.size(); i++) {
+      // Packets arrive one after another and their rows start in the second the previous
+      // packet's rows end or in the next one: append them, up to a size, rather than caching
+      // every packet as a piece or letting a packet replace the one before it in that second.
+      for (int i = 0; add && i < helis.size(); i++) {
+        final CachedHelicorder ch = helis.get(i);
+        final double gap = helicorder.getStartTime() - ch.helicorder.getEndTime();
+        if (gap >= 0 && gap <= 1
+            && ch.getMemorySize() + helicorder.getMemorySize() < MAX_WAVE_SIZE) {
+          final long before = ch.getMemorySize();
+          ch.helicorder.concatenate(helicorder);
+          ch.t2 = ch.helicorder.getEndTime();
+          heliBytes += ch.getMemorySize() - before;
+          ch.lastAccess = System.currentTimeMillis();
+          add = false;
+        }
+      }
+
+      for (int i = 0; add && i < helis.size(); i++) {
         final CachedHelicorder ch = helis.get(i);
 
         if (ch.helicorder.overlaps(helicorder)) {
@@ -528,8 +545,12 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
           // cached is right side
           hd2 = ch.helicorder.subset(ch.t1, endTime);
         } else if (startTime >= ch.t1 && startTime <= ch.t2) {
-          // cached is left side
-          hd2 = ch.helicorder.subset(startTime, ch.t2);
+          // cached is left side; subset would drop the piece's last row
+          final int first = ch.helicorder.findClosestTimeIndexGreaterThan(startTime);
+          if (first >= 0) {
+            hd2 = new HelicorderData();
+            hd2.setData(ch.helicorder.getData().viewPart(first, 0, ch.helicorder.rows() - first, 3));
+          }
         }
 
         // if cached data found
