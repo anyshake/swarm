@@ -456,6 +456,7 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
           parts.add(cw.wave);
           minT = Math.min(minT, cw.t1);
           maxT = Math.max(maxT, cw.t2);
+          cw.lastAccess = System.currentTimeMillis();
         }
       }
 
