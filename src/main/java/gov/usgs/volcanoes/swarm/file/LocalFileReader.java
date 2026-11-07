@@ -4,6 +4,7 @@ import gov.usgs.volcanoes.core.data.Wave;
 import gov.usgs.volcanoes.core.time.J2kSec;
 import gov.usgs.volcanoes.swarm.TimeConstants;
 import gov.usgs.volcanoes.swarm.data.CachedDataSource;
+import java.io.BufferedInputStream;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -118,7 +119,8 @@ public class LocalFileReader implements DataStructureConst, TimeConstants {
           error.append(file);
         }
       } else {
-        try (DataInputStream dis = new DataInputStream(new FileInputStream(file))) {
+        try (DataInputStream dis =
+            new DataInputStream(new BufferedInputStream(new FileInputStream(file)))) {
           while (dis.available() > 0 && (sr = SeedRecord.read(dis)) instanceof DataRecord) {
             dr = (DataRecord) sr;
             s = LocalFileUtil.getStation(dr.getHeader());
