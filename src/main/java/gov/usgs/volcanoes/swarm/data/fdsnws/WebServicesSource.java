@@ -91,7 +91,7 @@ public class WebServicesSource extends SeismicDataSource implements WebServiceCo
   /**
    * Close the data source.
    */
-  public synchronized void close() {
+  public void close() {
     LOGGER.debug("web service closed {}", count);
   }
 
@@ -190,11 +190,13 @@ public class WebServicesSource extends SeismicDataSource implements WebServiceCo
    * 
    * @return whether or not this is an active data source.
    */
-  public synchronized boolean isActiveSource() {
+  public boolean isActiveSource() {
     return true;
   }
 
-  public synchronized void notifyDataNotNeeded(String station, double t1, double t2, GulperListener gl) {
+  // Not synchronized: a closing helicorder calls this on the Swing thread, and the source lock
+  // is held for whole downloads.
+  public void notifyDataNotNeeded(String station, double t1, double t2, GulperListener gl) {
     GulperList.INSTANCE.killGulper(getGulperKey(station), gl);
   }
 

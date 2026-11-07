@@ -237,7 +237,7 @@ public class WwsSource extends SeismicDataSource implements RsamSource {
    * 
    * @see gov.usgs.volcanoes.swarm.data.SeismicDataSource#isActiveSource()
    */
-  public synchronized boolean isActiveSource() {
+  public boolean isActiveSource() {
     return true;
   }
 

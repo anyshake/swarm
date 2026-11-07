@@ -228,12 +228,14 @@ public class WaveServerSource extends SeismicDataSource {
     return new WaveServerSource(this);
   }
 
-  public synchronized void notifyDataNotNeeded(String station, double t1, double t2,
+  // Not synchronized: a closing helicorder calls this on the Swing thread, and the source lock
+  // is held for whole downloads.
+  public void notifyDataNotNeeded(String station, double t1, double t2,
       GulperListener gl) {
     GulperList.INSTANCE.killGulper("ws:" + station, gl);
   }
 
-  public synchronized boolean isActiveSource() {
+  public boolean isActiveSource() {
     return true;
   }
 }
