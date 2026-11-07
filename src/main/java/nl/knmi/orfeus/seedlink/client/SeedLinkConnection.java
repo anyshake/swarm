@@ -1190,11 +1190,19 @@ public class SeedLinkConnection {
 
             // Connect to remote SeedLink server
             if (state.state == SLState.SL_DOWN && state.netdly_trig == 0) {
+                // A lone INFO request has no stream to resume. Once its link is lost, return
+                // instead of retrying until the server is back while the caller waits.
+                if (streams.isEmpty() && infoRequestString == null) {
+                    return null;
+                }
                 try {
                     connect();
                     state.state = SLState.SL_UP;
                 } catch (Exception e) {
                     sllog.log(true, 0, e.toString());
+                    if (streams.isEmpty()) {
+                        return null;
+                    }
                 }
                 state.netto_trig = -1;
                 state.netdly_trig = -1;
