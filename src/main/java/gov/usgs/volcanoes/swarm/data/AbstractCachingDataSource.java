@@ -268,11 +268,13 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
       // Packets arrive one after another and their rows start in the second the previous
       // packet's rows end or in the next one: append them, up to a size, rather than caching
       // every packet as a piece or letting a packet replace the one before it in that second.
+      // A packet delivered twice is in the piece already; the overlap below leaves it out.
       for (int i = 0; add && i < helis.size(); i++) {
         final CachedHelicorder ch = helis.get(i);
         final double gap = helicorder.getStartTime() - ch.helicorder.getEndTime();
         if (gap >= 0 && gap <= 1
-            && ch.getMemorySize() + helicorder.getMemorySize() < MAX_WAVE_SIZE) {
+            && ch.getMemorySize() + helicorder.getMemorySize() < MAX_WAVE_SIZE
+            && !(gap == 0 && hasRows(ch.helicorder.getData(), helicorder.getData()))) {
           final long before = ch.getMemorySize();
           ch.helicorder.concatenate(helicorder);
           ch.t2 = ch.helicorder.getEndTime();
@@ -313,6 +315,26 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
         enforceSize();
       }
     }
+  }
+
+  /**
+   * Whether every row of a packet is already in the piece's last second, as when a record
+   * arrives twice.
+   */
+  private static boolean hasRows(final DoubleMatrix2D piece, final DoubleMatrix2D packet) {
+    final double start = packet.getQuick(0, 0);
+    for (int i = 0; i < packet.rows(); i++) {
+      boolean found = false;
+      for (int j = piece.rows() - 1; !found && j >= 0 && piece.getQuick(j, 0) >= start; j--) {
+        found = piece.getQuick(j, 0) == packet.getQuick(i, 0)
+            && piece.getQuick(j, 1) == packet.getQuick(i, 1)
+            && piece.getQuick(j, 2) == packet.getQuick(i, 2);
+      }
+      if (!found) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /**
