@@ -218,10 +218,6 @@ public class MultiMonitor extends SwarmFrame implements Kioskable {
     timer.schedule(refreshTask, 0, refreshInterval);
   }
 
-  public void setDataSource(final SeismicDataSource sds) {
-    dataSource = sds;
-  }
-
   public SeismicDataSource getDataSource() {
     return dataSource;
   }
@@ -723,16 +719,6 @@ public class MultiMonitor extends SwarmFrame implements Kioskable {
     resizeWaves();
   }
 
-  /**
-   * Remove all waves from monitor.
-   */
-  public synchronized void removeAllWaves() {
-    waveMap.clear();
-    panels.clear();
-    wavePanel.removeAll();
-    resizeWaves();
-  }
-
   private void setBackgroundColor(final WaveViewPanel wvp, final int i) {
     if (i % 2 != 0) {
       wvp.setBackgroundColor(Color.WHITE);
@@ -845,10 +831,6 @@ public class MultiMonitor extends SwarmFrame implements Kioskable {
   public void setPauseStartTime(final double start) {
     pauseStartTime = start;
     pauseButton.setSelected(!Double.isNaN(pauseStartTime));
-  }
-
-  public double getPauseStartTime() {
-    return pauseStartTime;
   }
 
   private void refresh() {

@@ -44,7 +44,6 @@ public abstract class AbstractCachingDataSource extends SeismicDataSource implem
   private long heliBytes;
   private long rsamBytes;
   protected CachePurgeAction[] purgeActions;
-  protected static Logger logger;
   protected static final JFrame applicationFrame = Swarm.getApplicationFrame();
 
   /**

@@ -120,7 +120,6 @@ public class WaveViewPanel extends JComponent {
   protected double mark2 = Double.NaN;
   protected double cursorMark = Double.NaN;
   protected boolean useFilterLabel = true;
-  protected Color borderColor;
   protected static final Color DARK_RED = new Color(168, 0, 0);
   protected static final Color DARK_GREEN = new Color(0, 168, 0);
   private static final Color DRAG_HIGHLIGHT = new Color(255, 255, 0, 128);
@@ -495,14 +494,6 @@ public class WaveViewPanel extends JComponent {
     statusText = text;
   }
 
-  public int getXOffset() {
-    return xOffset;
-  }
-
-  public int getYOffset() {
-    return yOffset;
-  }
-
   public WaveViewSettings getSettings() {
     return settings;
   }
@@ -527,21 +518,12 @@ public class WaveViewPanel extends JComponent {
     return wave;
   }
 
-  public WaveViewSettings getWaveViewSettings() {
-    return settings;
-  }
-
   public String getChannel() {
     return channel;
   }
 
   public void setChannel(String c) {
     channel = c;
-  }
-
-  public void setSettings(WaveViewSettings s) {
-    settings = s;
-    processSettings();
   }
 
   public SeismicDataSource getDataSource() {
@@ -562,10 +544,6 @@ public class WaveViewPanel extends JComponent {
 
   public void settingsChanged() {
     processSettings();
-  }
-
-  public boolean isTimeSeries() {
-    return timeSeries;
   }
 
   /**
@@ -589,10 +567,6 @@ public class WaveViewPanel extends JComponent {
 
   public void setBottomBorderColor(Color c) {
     bottomBorderColor = c;
-  }
-
-  public void setBorderColor(Color c) {
-    borderColor = c;
   }
 
   /**
@@ -919,10 +893,6 @@ public class WaveViewPanel extends JComponent {
     if (bottomBorderColor != null) {
       g2.setColor(bottomBorderColor);
       g2.drawLine(0, height - 1, width, height - 1);
-    }
-    if (borderColor != null) {
-      g2.setColor(borderColor);
-      g2.drawRect(0, 0, width - 1, height - 2);
     }
   }
 
