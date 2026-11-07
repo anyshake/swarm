@@ -1357,6 +1357,11 @@ public class SeedLinkConnection {
                 byte[] bytesread = null;
                 try {
                     bytesread = receiveData(state.bytesRemaining(), sladdr);
+                    if (bytesread == null) {
+                        // The server closed the link. Like libslink, reconnect after netdly rather
+                        // than reading nothing until the network timeout (netto) fires.
+                        throw new IOException("TCP FIN or EOF received");
+                    }
                 } catch (IOException ioe) {          // read() failed
                     sllog.log(true, 0, "[" + sladdr + "] socket read error: " + ioe + ", reconnecting in " + netdly + "s");
                     disconnect();
