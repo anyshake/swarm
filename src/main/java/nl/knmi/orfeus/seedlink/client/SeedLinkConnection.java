@@ -1655,7 +1655,7 @@ public class SeedLinkConnection {
             }
         }
         if (bytesread == null) {
-            throw (new SeedLinkException("[" + code + "] bad response to '" + sendbytes + "'"));
+            throw (new SeedLinkException("[" + code + "] bad response to '" + (new String(sendbytes)) + "'"));
         }
 
         return (bytesread);
