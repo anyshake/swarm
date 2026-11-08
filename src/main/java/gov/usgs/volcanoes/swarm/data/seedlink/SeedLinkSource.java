@@ -57,11 +57,19 @@ public class SeedLinkSource extends SeismicDataSource {
   /** The server port. */
   private int port;
 
+  /*
+   * The client maps below are keyed by server and channel (see key) and shared by every source:
+   * sources on one server fill the same cache, so a second connection for a channel only fetched
+   * the same records again, and servers limit how many connections one address may open.
+   */
+
   /** SeedLink clients for real time updates. */
-  private final ConcurrentHashMap<String, SeedLinkClient> rtClients = new ConcurrentHashMap<>();
+  private static final ConcurrentHashMap<String, SeedLinkClient> rtClients =
+      new ConcurrentHashMap<>();
 
   /** SeedLink clients for past data. */
-  private final ConcurrentHashMap<String, SeedLinkClient> clients = new ConcurrentHashMap<>();
+  private static final ConcurrentHashMap<String, SeedLinkClient> clients =
+      new ConcurrentHashMap<>();
 
   /**
    * How long a past-data request stands before the same range may be asked for again. Matches the
@@ -77,7 +85,7 @@ public class SeedLinkSource extends SeismicDataSource {
       new ConcurrentHashMap<String, FutureTask<String>>();
 
   /** The earliest start asked of the server for each channel, and when, as {start, millis}. */
-  private final ConcurrentHashMap<String, double[]> backfills = new ConcurrentHashMap<>();
+  private static final ConcurrentHashMap<String, double[]> backfills = new ConcurrentHashMap<>();
 
   /** How long a past-data request is waited for. */
   private static final long WINDOW_WAIT_MS = 10000;
@@ -169,6 +177,16 @@ public class SeedLinkSource extends SeismicDataSource {
       LOGGER.warn("SeedLinkSource Could not get channels: {}", server, ex.getCause());
       return null;
     }
+  }
+
+  /**
+   * Key of a channel in the shared client maps.
+   *
+   * @param scnl channel with $ separators
+   * @return server and channel
+   */
+  private String key(String scnl) {
+    return host + ":" + port + " " + scnl;
   }
 
   /**
@@ -311,20 +329,21 @@ public class SeedLinkSource extends SeismicDataSource {
    * @param scnl channel
    */
   private void startRealtimeClient(String scnl) {
-    SeedLinkClient client = rtClients.get(scnl);
+    final String key = key(scnl);
+    SeedLinkClient client = rtClients.get(key);
     if (client == null) {
       final double t1 = J2kSec.now() - 600.0;
       final double t2 = Double.NaN;
       final SeedLinkClient fresh = new SeedLinkClient(host, port, t1, t2, scnl);
       // a helicorder and a monitor asking at once must not both start a client for the channel
-      client = rtClients.putIfAbsent(scnl, fresh);
+      client = rtClients.putIfAbsent(key, fresh);
       if (client == null) {
         LOGGER.debug("SeedLinkSource startRealtimeClient: {}", fresh);
         // a client that finishes late must not drop the one that replaced it
         fresh.setDoneListener(new DoneListener() {
           @Override
           public void done(String station) {
-            if (rtClients.remove(station, fresh)) {
+            if (rtClients.remove(key, fresh)) {
               LOGGER.debug("SeedLinkSource rtclient done: {}", fresh);
             }
           }
@@ -350,11 +369,12 @@ public class SeedLinkSource extends SeismicDataSource {
     // Every refresh asks for the time before the oldest cached sample. When the server has nothing
     // older, asking again only opened another connection and waited out the timeout each time.
     final long now = System.currentTimeMillis();
-    final double[] asked = backfills.get(scnl);
+    final String key = key(scnl);
+    final double[] asked = backfills.get(key);
     if (asked != null && asked[0] <= t1 && now - asked[1] < BACKFILL_RETRY_MS) {
       return;
     }
-    backfills.put(scnl, new double[] {t1, now});
+    backfills.put(key, new double[] {t1, now});
 
     final SeedLinkClient whole = startPastClient(scnl, t1, t2);
     whole.waitForWindow(WINDOW_WAIT_MS);
@@ -366,7 +386,7 @@ public class SeedLinkSource extends SeismicDataSource {
     // the usual wait are asked on the next refresh, which starts at the oldest cached sample.
     for (double end = t2; end > t1; end -= PIECE_SECONDS) {
       if (System.currentTimeMillis() - now > WINDOW_WAIT_MS) {
-        backfills.put(scnl, new double[] {end, now});
+        backfills.put(key, new double[] {end, now});
         return;
       }
       final SeedLinkClient piece = startPastClient(scnl, Math.max(t1, end - PIECE_SECONDS), end);
@@ -385,7 +405,8 @@ public class SeedLinkSource extends SeismicDataSource {
    * @return the started client
    */
   private SeedLinkClient startPastClient(String scnl, double t1, double t2) {
-    SeedLinkClient client = clients.get(scnl);
+    final String key = key(scnl);
+    SeedLinkClient client = clients.get(key);
     if (client != null) {
       // the new request starts no later, or the one before it has arrived
       client.closeConnection();
@@ -396,12 +417,12 @@ public class SeedLinkSource extends SeismicDataSource {
     fresh.setDoneListener(new DoneListener() {
       @Override
       public void done(String station) {
-        if (clients.remove(station, fresh)) {
+        if (clients.remove(key, fresh)) {
           LOGGER.debug("SeedLinkSource client done: {}", fresh);
         }
       }
     });
-    clients.put(scnl, fresh);
+    clients.put(key, fresh);
     fresh.updateLastRequestTime();
     fresh.start();
     return fresh;
@@ -433,7 +454,7 @@ public class SeedLinkSource extends SeismicDataSource {
     // Could be removed and added back later if other frames are using it but may lead to gaps in
     // data
     station = station.replace(' ', '$');
-    SeedLinkClient client = rtClients.remove(station);
+    SeedLinkClient client = rtClients.remove(key(station));
     if (client != null) {
       LOGGER.debug("SeedLinkSource notifyDataNotNeeded: {}", client);
       client.closeConnection();
