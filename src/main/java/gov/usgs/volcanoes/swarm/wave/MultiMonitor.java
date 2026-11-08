@@ -48,9 +48,10 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import javax.swing.AbstractAction;
@@ -834,24 +835,17 @@ public class MultiMonitor extends SwarmFrame implements Kioskable {
     pauseButton.setSelected(!Double.isNaN(pauseStartTime));
   }
 
+  /** Panels whose fetch from an earlier refresh has not returned yet. */
+  private final Set<WaveViewPanel> fetching =
+      Collections.newSetFromMap(new ConcurrentHashMap<WaveViewPanel, Boolean>());
+
+  /**
+   * Fetch every channel at once, each on its own. A channel whose stream is down can wait up to
+   * 10 s for data; it skips refreshes until then while the other channels keep updating. Fetching
+   * one after another made every panel wait for it, and so did starting the next refresh only when
+   * all had returned.
+   */
   private void refresh() {
-    if (throbber.getCount() >= 1) {
-      return;
-    }
-
-    throbber.increment();
-    Workers.execute(new Runnable() {
-      public void run() {
-        try {
-          fetch();
-        } finally {
-          throbber.decrement();
-        }
-      }
-    });
-  }
-
-  private void fetch() {
     final double[] times = getTimeWindow();
     final double now = times[1];
     final double start = times[0];
@@ -859,24 +853,21 @@ public class MultiMonitor extends SwarmFrame implements Kioskable {
     synchronized (this) {
       current = panels.toArray(new WaveViewPanel[panels.size()]);
     }
-    // Every channel at once. A channel's first fetch waits for its real-time stream to start, so
-    // fetching one after another filled the panels in one at a time.
-    final CountDownLatch done = new CountDownLatch(current.length);
     for (final WaveViewPanel wvp : current) {
+      if (!fetching.add(wvp)) {
+        continue;
+      }
+      throbber.increment();
       Workers.execute(new Runnable() {
         public void run() {
           try {
             fetch(wvp, start, now);
           } finally {
-            done.countDown();
+            fetching.remove(wvp);
+            throbber.decrement();
           }
         }
       });
-    }
-    try {
-      done.await();
-    } catch (final InterruptedException e) {
-      Thread.currentThread().interrupt();
     }
   }
 
