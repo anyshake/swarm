@@ -31,8 +31,10 @@ public final class ChannelUtil {
    * @param source the seismic data source.
    * @return the channel information text.
    */
-  public static String addChannel(List<String> channels, Set<String> knownChannels,
+  public static synchronized String addChannel(List<String> channels, Set<String> knownChannels,
       AbstractChannelInfo ch, SeismicDataSource source) {
+    // Synchronized: sources opened together load at once, and they share the channels' Metadata
+    // and the groups map, neither of which is thread safe.
     final String formattedScnl = ch.getFormattedScnl();
     if (!knownChannels.contains(formattedScnl)) {
       Metadata md = SwarmConfig.getInstance().getMetadata(formattedScnl, true);
@@ -109,7 +111,8 @@ public final class ChannelUtil {
    * @param groupsType groups type.
    * @return the list of groups.
    */
-  public static final List<String> getGroups(AbstractChannelInfo ch, GroupsType groupsType) {
+  public static final synchronized List<String> getGroups(AbstractChannelInfo ch,
+      GroupsType groupsType) {
     List<String> groups = groupsMap.get(ch);
     if (groups == null) {
       groups = new ArrayList<String>(1);
