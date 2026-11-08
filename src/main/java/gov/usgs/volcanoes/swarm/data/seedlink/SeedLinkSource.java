@@ -71,6 +71,16 @@ public class SeedLinkSource extends SeismicDataSource {
   private static final ConcurrentHashMap<String, SeedLinkClient> clients =
       new ConcurrentHashMap<>();
 
+  /** When each channel's real-time client last ended. */
+  private static final ConcurrentHashMap<String, Long> rtEnded = new ConcurrentHashMap<>();
+
+  /**
+   * How soon a channel's real-time client may start again after one ended, the same as a client's
+   * own reconnect delay. A server that refuses a station ended its client at once, and every
+   * refresh of every view of the channel then opened another connection, several a second.
+   */
+  private static final long RT_RESTART_MS = 10000;
+
   /**
    * How long a past-data request stands before the same range may be asked for again. Matches the
    * idle time after which a client closes itself.
@@ -332,6 +342,10 @@ public class SeedLinkSource extends SeismicDataSource {
     final String key = key(scnl);
     SeedLinkClient client = rtClients.get(key);
     if (client == null) {
+      final Long ended = rtEnded.get(key);
+      if (ended != null && System.currentTimeMillis() - ended < RT_RESTART_MS) {
+        return;
+      }
       final double t1 = J2kSec.now() - 600.0;
       final double t2 = Double.NaN;
       final SeedLinkClient fresh = new SeedLinkClient(host, port, t1, t2, scnl);
@@ -344,6 +358,7 @@ public class SeedLinkSource extends SeismicDataSource {
           @Override
           public void done(String station) {
             if (rtClients.remove(key, fresh)) {
+              rtEnded.put(key, System.currentTimeMillis());
               LOGGER.debug("SeedLinkSource rtclient done: {}", fresh);
             }
           }
