@@ -50,6 +50,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import javax.swing.AbstractAction;
@@ -851,8 +852,6 @@ public class MultiMonitor extends SwarmFrame implements Kioskable {
   }
 
   private void fetch() {
-    String channel = null;
-
     final double[] times = getTimeWindow();
     final double now = times[1];
     final double start = times[0];
@@ -860,40 +859,60 @@ public class MultiMonitor extends SwarmFrame implements Kioskable {
     synchronized (this) {
       current = panels.toArray(new WaveViewPanel[panels.size()]);
     }
+    // Every channel at once. A channel's first fetch waits for its real-time stream to start, so
+    // fetching one after another filled the panels in one at a time.
+    final CountDownLatch done = new CountDownLatch(current.length);
     for (final WaveViewPanel wvp : current) {
-      wvp.setWorking(true);
-      channel = wvp.getChannel();
-      try {
-        Wave sw = waveMap.get(channel);
-        if (sw != null) {
-          if (sw.overlaps(start, now)) { // runaway monitor bug fix
-            Wave newer = null;
-            if (sw.getEndTime() < now) {
-              newer = dataSource.getWave(channel, sw.getEndTime() - 10, now);
-            }
-            Wave older = null;
-            if (sw.getStartTime() > start) {
-              older = dataSource.getWave(channel, start, sw.getStartTime() + 10);
-            }
-            sw = window(start, older, sw, newer);
-          } else {
-            sw = null;
+      Workers.execute(new Runnable() {
+        public void run() {
+          try {
+            fetch(wvp, start, now);
+          } finally {
+            done.countDown();
           }
         }
-
-        // something bad happened above, just get the whole wave
-        if (sw == null) {
-          sw = dataSource.getWave(channel, start, now);
-        }
-        if (sw != null) {
-          waveMap.put(channel, sw);
-        }
-      } catch (final Throwable t) {
-        System.out.println(channel);
-        t.printStackTrace();
-      }
-      wvp.setWorking(false);
+      });
     }
+    try {
+      done.await();
+    } catch (final InterruptedException e) {
+      Thread.currentThread().interrupt();
+    }
+  }
+
+  private void fetch(final WaveViewPanel wvp, final double start, final double now) {
+    wvp.setWorking(true);
+    final String channel = wvp.getChannel();
+    try {
+      Wave sw = waveMap.get(channel);
+      if (sw != null) {
+        if (sw.overlaps(start, now)) { // runaway monitor bug fix
+          Wave newer = null;
+          if (sw.getEndTime() < now) {
+            newer = dataSource.getWave(channel, sw.getEndTime() - 10, now);
+          }
+          Wave older = null;
+          if (sw.getStartTime() > start) {
+            older = dataSource.getWave(channel, start, sw.getStartTime() + 10);
+          }
+          sw = window(start, older, sw, newer);
+        } else {
+          sw = null;
+        }
+      }
+
+      // something bad happened above, just get the whole wave
+      if (sw == null) {
+        sw = dataSource.getWave(channel, start, now);
+      }
+      if (sw != null) {
+        waveMap.put(channel, sw);
+      }
+    } catch (final Throwable t) {
+      System.out.println(channel);
+      t.printStackTrace();
+    }
+    wvp.setWorking(false);
   }
 
   /**
