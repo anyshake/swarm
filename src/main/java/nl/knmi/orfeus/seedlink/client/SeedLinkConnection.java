@@ -509,12 +509,22 @@ public class SeedLinkConnection {
      */
     protected String createInfoString(StringBuffer strBuf) {
 
-        int start = 0;
-        while ((start = strBuf.indexOf("><", start)) > 0) {
-            strBuf.replace(start, start + 2, ">\n<");
+        // Put a newline between every "><" in one pass. Inserting them one by one shifted the rest
+        // of the buffer each time, which took seconds for a large server's STREAMS list. As before,
+        // nothing is inserted when the first "><" is at the very start.
+        if (strBuf.indexOf("><") <= 0) {
+            return (strBuf.toString().trim());
         }
-
-        return (strBuf.toString().trim());
+        final int n = strBuf.length();
+        final StringBuilder out = new StringBuilder(n + n / 16);
+        for (int i = 0; i < n; i++) {
+            final char c = strBuf.charAt(i);
+            out.append(c);
+            if (c == '>' && i + 1 < n && strBuf.charAt(i + 1) == '<') {
+                out.append('\n');
+            }
+        }
+        return (out.toString().trim());
 
     }
 
