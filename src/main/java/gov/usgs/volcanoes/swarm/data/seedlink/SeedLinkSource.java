@@ -17,7 +17,10 @@ import java.nio.channels.FileChannel;
 import java.nio.charset.Charset;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,6 +69,13 @@ public class SeedLinkSource extends SeismicDataSource {
    */
   private static final long BACKFILL_RETRY_MS = 5 * 60 * 1000L;
 
+  /**
+   * STREAMS requests in progress, by server. Sources on one server opened together, as a layout
+   * does, share one download of the list instead of each fetching the same megabytes.
+   */
+  private static final ConcurrentHashMap<String, FutureTask<String>> STREAMS_FETCHES =
+      new ConcurrentHashMap<String, FutureTask<String>>();
+
   /** The earliest start asked of the server for each channel, and when, as {start, millis}. */
   private final ConcurrentHashMap<String, double[]> backfills = new ConcurrentHashMap<>();
 
@@ -109,7 +119,7 @@ public class SeedLinkSource extends SeismicDataSource {
     String infoString = readChannelCache();
 
     if (infoString == null) {
-      infoString = new SeedLinkClient(host, port).getInfoString("STREAMS");
+      infoString = fetchStreams();
       writeChannelCache(infoString);
     }
 
@@ -127,6 +137,39 @@ public class SeedLinkSource extends SeismicDataSource {
     return Collections.unmodifiableList(channels);
   }
 
+
+  /**
+   * Ask the server for its STREAMS list, or wait for the request already running for it. A later
+   * call, such as a refresh, asks again.
+   *
+   * @return the list, or null if it could not be read
+   */
+  private String fetchStreams() {
+    final String server = host + ":" + port;
+    final FutureTask<String> fetch = new FutureTask<String>(new Callable<String>() {
+      public String call() {
+        return new SeedLinkClient(host, port).getInfoString("STREAMS");
+      }
+    });
+    FutureTask<String> running = STREAMS_FETCHES.putIfAbsent(server, fetch);
+    if (running == null) {
+      running = fetch;
+      try {
+        fetch.run();
+      } finally {
+        STREAMS_FETCHES.remove(server, fetch);
+      }
+    }
+    try {
+      return running.get();
+    } catch (InterruptedException ex) {
+      Thread.currentThread().interrupt();
+      return null;
+    } catch (ExecutionException ex) {
+      LOGGER.warn("SeedLinkSource Could not get channels: {}", server, ex.getCause());
+      return null;
+    }
+  }
 
   /**
    * Read channel data from cache.
